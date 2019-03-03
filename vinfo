@@ -1,0 +1,93 @@
+#!/usr/bin/python
+
+# gHost - Devin Shoemaker 2019-02-28
+# retrieves vhost for a specific site on cPanel servers 
+# https://github.com/tailwag/ghost
+# usage:
+#       $ ghost example.com
+
+import os 
+import re
+import sys 
+import subprocess
+
+def isset (varIn):
+	return varIn in locals() or varIn in globals()
+
+search = sys.argv[1]
+
+# retrieve whole httpd.conf
+conf = subprocess.Popen(["sudo", "cat", "/etc/apache2/conf/httpd.conf"], stdout=subprocess.PIPE).communicate()[0]
+
+# convert httpd.conf into list by line
+vhost = conf.split('\n')
+
+# define regex for searching by domanin name 
+if os.path.isdir(search):
+    serverna = re.compile(r'\s{2}DocumentRoot\s'+search)
+else:
+    serverna = re.compile(r'\s{2}Server(Name|Alias).*?\s'+search+'.*?')
+
+# return line searched for 
+found = list(filter(serverna.match, vhost))[-1]
+
+# get line number of returned line
+check = [i for i, x in enumerate(vhost) if x == found][-1]
+
+vbegin=check
+vend=check
+
+# matched opening and closing vhost tag 
+vline = re.compile(r'</?VirtualHost.*?>')
+
+while vbegin <= check:
+    grep = vline.search(vhost[vbegin])
+    if grep != None:
+        break
+    vbegin -= 1
+
+while vend >= check:
+    grep = vline.search(vhost[vend])
+    if grep != None:
+        break
+    vend += 1
+
+prog=vbegin
+
+foundHost = []
+while prog <= vend:
+    foundHost.append(vhost[prog])
+    prog += 1
+
+def getDomains(hostIn):
+	domMatch = re.compile(r'\s{2}Server(Name|Alias).*')
+	domains = list(filter(domMatch.match, hostIn))
+	
+	domList  = domains[0].split(' ')[3:]
+	aliasDom = domains[1].split(' ')[3:]
+	
+	domList.extend(aliasDom)
+	desc = "Domains"
+	for dom in domList:
+		print("%-10s: %5s" % (desc, dom))
+		desc = ''
+	print
+def getRoot(hostIn):
+	drMatch  = re.compile(r'\s{2}DocumentRoot.*')
+	docRoot = list(filter(drMatch.match, hostIn))[-1].split(' ')[-1]
+	print("%-10s: %5s" % ('Doc Root', docRoot))
+	print
+
+def getCert(hostIn):
+	certMatch = re.compile(r'\s{4}SSLCertificateFilee.*')
+	if len(filter(certMatch.match, hostIn)) > 0:
+		certFile = list(filter(certMatch.match, hostIn))[-1].split(' ')[-1]
+		print("%-10s: %5s" % ('Cert File', certFile))
+	else:
+		print("--SSL Not Enabled--")
+	
+	print
+
+getRoot(foundHost)
+getDomains(foundHost)
+getCert(foundHost)
