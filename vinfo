@@ -79,7 +79,7 @@ def getRoot(hostIn):
 	print
 
 def getCert(hostIn):
-	certMatch = re.compile(r'\s{4}SSLCertificateFilee.*')
+	certMatch = re.compile(r'\s{4}SSLCertificateFile.*')
 	if len(filter(certMatch.match, hostIn)) > 0:
 		certFile = list(filter(certMatch.match, hostIn))[-1].split(' ')[-1]
 		print("%-10s: %5s" % ('Cert File', certFile))
