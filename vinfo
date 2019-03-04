@@ -20,7 +20,8 @@ frmStr = "%-13s: %5s"
 search = sys.argv[1]
 
 # retrieve whole httpd.conf
-conf = subprocess.Popen(["sudo", "cat", "/etc/apache2/conf/httpd.conf"], stdout=subprocess.PIPE).communicate()[0]
+getConf = 'sudo cat /etc/apache2/conf/httpd.conf'
+conf = subprocess.Popen(getConf, stdout=subprocess.PIPE, shell=True).communicate()[0]
 
 # convert httpd.conf into list by line
 vhost = conf.split('\n')
