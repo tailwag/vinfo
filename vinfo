@@ -110,10 +110,14 @@ def getCert(hostIn):
 		sslFrm = "%-6s  %5s"
 		runFile = 'sudo cat ' + certFile + ' | openssl x509 -text | grep -Eo "Not After\s:.+\\b" | cut -d: -f2-5 | tr \'\n\' \' \''
 		fileCert = subprocess.Popen(runFile, stdout=subprocess.PIPE, shell=True).communicate()[0]
+                if os.path.isdir(search):
+                    snDom = certFile.split('/')[5]
+                else:
+                    snDom = search
 		sslExp = list()
 		for port in [443, 465, 993, 995]: 
 			portStr = str(port ) + ' '
-			runPort = 'openssl s_client -showcerts -servername ' + certFile.split('/')[5] + ' -connect ' + ipAddy + ':' + portStr + ' < /dev/null 2>&1 | openssl x509 -text | grep -Eo "Not After\s:.+\\b" | cut -d: -f2-5 | tr \'\n\' \' \''
+			runPort = 'openssl s_client -showcerts -servername ' + snDom + ' -connect ' + ipAddy + ':' + portStr + ' < /dev/null 2>&1 | openssl x509 -text | grep -Eo "Not After\s:.+\\b" | cut -d: -f2-5 | tr \'\n\' \' \''
 			sslExp.append(portStr + " : " + subprocess.Popen(runPort, stdout=subprocess.PIPE, shell=True).communicate()[0])
 		print
 		print(sslFrm % ('', 'File : ' + fileCert))
