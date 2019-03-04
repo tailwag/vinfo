@@ -122,7 +122,7 @@ def getCert(hostIn):
             naRegex = re.compile(r'Not After.*')
             notAfter = ':'.join(list(filter(naRegex.match, xArray))[-1].split(':')[1:])
             dnsRegex = re.compile(r'DNS:.*')
-            dnsHostArr = list(filter(dnsRegex.match, xArray))[-1].replace("DNS:", "").split(' ')
+            dnsHostArr = list(filter(dnsRegex.match, xArray))[-1].replace("DNS:", "").replace(",", "").split(' ')
             isValid = 'Invalid'
             for val in dnsHostArr:
                 if val == snDom:
