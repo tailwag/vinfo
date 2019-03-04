@@ -38,26 +38,29 @@ found = list(filter(serverna.match, vhost))[-1]
 # get line number of returned line
 check = [i for i, x in enumerate(vhost) if x == found][-1]
 
-vbegin=check
-vend=check
+vbegin = check
+vend = check
 
 # matched opening and closing vhost tag 
 vline = re.compile(r'</?VirtualHost.*?>')
 
+# determine beginning of desired vhost
 while vbegin <= check:
     grep = vline.search(vhost[vbegin])
     if grep != None:
         break
     vbegin -= 1
 
+# determine end of desired vhost
 while vend >= check:
     grep = vline.search(vhost[vend])
     if grep != None:
         break
     vend += 1
 
-prog=vbegin
+prog = vbegin
 
+# add each line of desired vhost to a list
 foundHost = []
 while prog <= vend:
     foundHost.append(vhost[prog])
