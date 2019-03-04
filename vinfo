@@ -90,9 +90,11 @@ def getDomains(hostIn):
 	domains = list(filter(domMatch.match, hostIn))
 	
 	domList  = domains[0].split(' ')[3:]
-	aliasDom = domains[1].split(' ')[3:]
-	
-	domList.extend(aliasDom)
+
+        if len(domains) > 1:
+	    aliasDom = domains[1].split(' ')[3:]
+	    domList.extend(aliasDom)
+
 	desc = "Domains"
 	for dom in domList:
 		print(frmStr % (desc, dom))
