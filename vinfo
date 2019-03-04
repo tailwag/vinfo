@@ -67,10 +67,13 @@ def getAddr(hostIn, mode = 'display'):
     ipAddr = list(filter(ipMatch.match, hostIn))[-1].split(' ')[-1].split(':')[0]
     if mode == 'display':
         print(frmStr % ('IP', ipAddr))
+
     elif mode == 'return':
     	return ipAddr
+
     else:
     	return 'Invalid Mode'
+
     print
 
 def getUser(hostIn):
@@ -99,6 +102,7 @@ def getDomains(hostIn):
     for dom in domList:
     	print(frmStr % (desc, dom))
     	desc = ''
+
     print
 
 def getCert(hostIn):
@@ -106,34 +110,55 @@ def getCert(hostIn):
     if len(filter(certMatch.match, hostIn)) > 0:
         certFile = list(filter(certMatch.match, hostIn))[-1].split(' ')[-1]
         print(frmStr % ('Certificate', certFile))
+
+        # uses previously defined ip function to return site's IP 
+        # used in openssl "connect" statement
         ipAddy = getAddr(hostIn, 'return')
         sslFrm = "%-6s  %5s"
+
+        # grab expiration date of cert file
         runFile = 'sudo cat ' + certFile + ' | openssl x509 -text | grep -Eo "Not After\s:.+\\b" | cut -d: -f2-5 | tr \'\n\' \' \''
 	fileCert = subprocess.Popen(runFile, stdout=subprocess.PIPE, shell=True).communicate()[0]
+
+        # selects domain for openssl tests
+        # if docroot is used, grabs domain from cert file path 
+        # specified domain used if domain used 
         if os.path.isdir(search):
             snDom = certFile.split('/')[5]
         else:
             snDom = search
+
+        # compiles list of SSL expiration dates on all applicable ports 
+        # "Valid" if domain specified is included in "DNS" names from openssl
 	sslExp = list()
 	for port in [443, 465, 993, 995]: 
-	    portStr = str(port ) + ' '
+            # grabs entirety of openssl x509 output for each port
+	    portStr = str(port)
             xRun= 'openssl s_client -showcerts -servername ' + snDom + ' -connect ' + ipAddy + ':' + portStr + ' < /dev/null 2>&1 | openssl x509 -text | sed "s:^[ \\t]*::"'
             xArray = subprocess.Popen(xRun, stdout=subprocess.PIPE, shell=True).communicate()[0].split('\n')
-            naRegex = re.compile(r'Not After.*')
-            notAfter = ':'.join(list(filter(naRegex.match, xArray))[-1].split(':')[1:])
+
             dnsRegex = re.compile(r'DNS:.*')
+            naRegex = re.compile(r'Not After.*')
+
+            notAfter = ':'.join(list(filter(naRegex.match, xArray))[-1].split(':')[1:])
             dnsHostArr = list(filter(dnsRegex.match, xArray))[-1].replace("DNS:", "").replace(",", "").split(' ')
+
+            # check specified domain against list of DNS names from openssl
+            # returns "Valid" if name is found
             isValid = 'Invalid'
             for val in dnsHostArr:
                 if val == snDom:
                     isValid = '  Valid' 
+                        
 	    sslExp.append(portStr + " : " + isValid + " -" + notAfter)
 	print
 	print(sslFrm % ('', 'File :          ' + fileCert))
 	for portCheck in sslExp:
 	    print(sslFrm % ('', portCheck))
+
     else:
 	print("--SSL Not Enabled--")
+
     print
 
 getAddr(foundHost)
