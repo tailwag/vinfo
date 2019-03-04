@@ -117,12 +117,21 @@ def getCert(hostIn):
 		sslExp = list()
 		for port in [443, 465, 993, 995]: 
 			portStr = str(port ) + ' '
-			runPort = 'openssl s_client -showcerts -servername ' + snDom + ' -connect ' + ipAddy + ':' + portStr + ' < /dev/null 2>&1 | openssl x509 -text | grep -Eo "Not After\s:.+\\b" | cut -d: -f2-5 | tr \'\n\' \' \''
-			sslExp.append(portStr + " : " + subprocess.Popen(runPort, stdout=subprocess.PIPE, shell=True).communicate()[0])
+                        xRun= 'openssl s_client -showcerts -servername ' + snDom + ' -connect ' + ipAddy + ':' + portStr + ' < /dev/null 2>&1 | openssl x509 -text | sed "s:^[ \\t]*::"'
+                        xArray = subprocess.Popen(xRun, stdout=subprocess.PIPE, shell=True).communicate()[0].split('\n')
+                        naRegex = re.compile(r'Not After.*')
+                        notAfter = ':'.join(list(filter(naRegex.match, xArray))[-1].split(':')[1:])
+                        dnsRegex = re.compile(r'DNS:.*')
+                        dnsHostArr = list(filter(dnsRegex.match, xArray))[-1].replace("DNS:", "").split(' ')
+                        isValid = 'Invalid'
+                        for val in dnsHostArr:
+                            if val == snDom:
+                                isValid = '  Valid' 
+			sslExp.append(portStr + " : " + isValid + " -" + notAfter)
 		print
-		print(sslFrm % ('', 'File : ' + fileCert))
-		for notAfter in sslExp:
-			print(sslFrm % ('', notAfter))
+		print(sslFrm % ('', 'File :          ' + fileCert))
+		for portCheck in sslExp:
+			print(sslFrm % ('', portCheck))
 	else:
 		print("--SSL Not Enabled--")
 	
@@ -133,3 +142,4 @@ getUser(foundHost)
 getRoot(foundHost)
 getDomains(foundHost)
 getCert(foundHost)
+
