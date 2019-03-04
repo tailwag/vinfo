@@ -13,7 +13,7 @@ import sys
 import subprocess
 
 def isset (varIn):
-	return varIn in locals() or varIn in globals()
+    return varIn in locals() or varIn in globals()
 	
 frmStr = "%-13s: %5s"
 
@@ -63,79 +63,78 @@ while prog <= vend:
     prog += 1
 
 def getAddr(hostIn, mode = 'display'):
-	ipMatch  = re.compile(r'<VirtualHost [0-2]?[0-9]{1,2}(\.[0-2]?[0-9]{1,2}){3}:(80|443)>')
-	ipAddr = list(filter(ipMatch.match, hostIn))[-1].split(' ')[-1].split(':')[0]
-	if mode == 'display':
-		print(frmStr % ('IP', ipAddr))
-	elif mode == 'return':
-		return ipAddr
-	else:
-		return 'Invalid Mode'
-	print
+    ipMatch  = re.compile(r'<VirtualHost [0-2]?[0-9]{1,2}(\.[0-2]?[0-9]{1,2}){3}:(80|443)>')
+    ipAddr = list(filter(ipMatch.match, hostIn))[-1].split(' ')[-1].split(':')[0]
+    if mode == 'display':
+        print(frmStr % ('IP', ipAddr))
+    elif mode == 'return':
+    	return ipAddr
+    else:
+    	return 'Invalid Mode'
+    print
 
 def getUser(hostIn):
-	usMatch  = re.compile(r'\s{4}PassengerUser.*')
-	docRoot = list(filter(usMatch.match, hostIn))[-1].split(' ')[-1]
-	print(frmStr % ('User', docRoot))
-	print
+    usMatch  = re.compile(r'\s{4}PassengerUser.*')
+    docRoot = list(filter(usMatch.match, hostIn))[-1].split(' ')[-1]
+    print(frmStr % ('User', docRoot))
+    print
 
 def getRoot(hostIn):
-	drMatch  = re.compile(r'\s{2}DocumentRoot.*')
-	docRoot = list(filter(drMatch.match, hostIn))[-1].split(' ')[-1]
-	print(frmStr % ('Doc Root', docRoot))
-	print
+    drMatch  = re.compile(r'\s{2}DocumentRoot.*')
+    docRoot = list(filter(drMatch.match, hostIn))[-1].split(' ')[-1]
+    print(frmStr % ('Doc Root', docRoot))
+    print
 
 def getDomains(hostIn):
-	domMatch = re.compile(r'\s{2}Server(Name|Alias).*')
-	domains = list(filter(domMatch.match, hostIn))
-	
-	domList  = domains[0].split(' ')[3:]
-
-        if len(domains) > 1:
-	    aliasDom = domains[1].split(' ')[3:]
-	    domList.extend(aliasDom)
-
-	desc = "Domains"
-	for dom in domList:
-		print(frmStr % (desc, dom))
-		desc = ''
-	print
+    domMatch = re.compile(r'\s{2}Server(Name|Alias).*')
+    domains = list(filter(domMatch.match, hostIn))
+    
+    domList  = domains[0].split(' ')[3:]
+    
+    if len(domains) > 1:
+        aliasDom = domains[1].split(' ')[3:]
+        domList.extend(aliasDom)
+    
+    desc = "Domains"
+    for dom in domList:
+    	print(frmStr % (desc, dom))
+    	desc = ''
+    print
 
 def getCert(hostIn):
-	certMatch = re.compile(r'\s{4}SSLCertificateFile.*')
-	if len(filter(certMatch.match, hostIn)) > 0:
-		certFile = list(filter(certMatch.match, hostIn))[-1].split(' ')[-1]
-		print(frmStr % ('Certificate', certFile))
-		ipAddy = getAddr(hostIn, 'return')
-		sslFrm = "%-6s  %5s"
-		runFile = 'sudo cat ' + certFile + ' | openssl x509 -text | grep -Eo "Not After\s:.+\\b" | cut -d: -f2-5 | tr \'\n\' \' \''
-		fileCert = subprocess.Popen(runFile, stdout=subprocess.PIPE, shell=True).communicate()[0]
-                if os.path.isdir(search):
-                    snDom = certFile.split('/')[5]
-                else:
-                    snDom = search
-		sslExp = list()
-		for port in [443, 465, 993, 995]: 
-			portStr = str(port ) + ' '
-                        xRun= 'openssl s_client -showcerts -servername ' + snDom + ' -connect ' + ipAddy + ':' + portStr + ' < /dev/null 2>&1 | openssl x509 -text | sed "s:^[ \\t]*::"'
-                        xArray = subprocess.Popen(xRun, stdout=subprocess.PIPE, shell=True).communicate()[0].split('\n')
-                        naRegex = re.compile(r'Not After.*')
-                        notAfter = ':'.join(list(filter(naRegex.match, xArray))[-1].split(':')[1:])
-                        dnsRegex = re.compile(r'DNS:.*')
-                        dnsHostArr = list(filter(dnsRegex.match, xArray))[-1].replace("DNS:", "").split(' ')
-                        isValid = 'Invalid'
-                        for val in dnsHostArr:
-                            if val == snDom:
-                                isValid = '  Valid' 
-			sslExp.append(portStr + " : " + isValid + " -" + notAfter)
-		print
-		print(sslFrm % ('', 'File :          ' + fileCert))
-		for portCheck in sslExp:
-			print(sslFrm % ('', portCheck))
-	else:
-		print("--SSL Not Enabled--")
-	
+    certMatch = re.compile(r'\s{4}SSLCertificateFile.*')
+    if len(filter(certMatch.match, hostIn)) > 0:
+        certFile = list(filter(certMatch.match, hostIn))[-1].split(' ')[-1]
+        print(frmStr % ('Certificate', certFile))
+        ipAddy = getAddr(hostIn, 'return')
+        sslFrm = "%-6s  %5s"
+        runFile = 'sudo cat ' + certFile + ' | openssl x509 -text | grep -Eo "Not After\s:.+\\b" | cut -d: -f2-5 | tr \'\n\' \' \''
+	fileCert = subprocess.Popen(runFile, stdout=subprocess.PIPE, shell=True).communicate()[0]
+        if os.path.isdir(search):
+            snDom = certFile.split('/')[5]
+        else:
+            snDom = search
+	sslExp = list()
+	for port in [443, 465, 993, 995]: 
+	    portStr = str(port ) + ' '
+            xRun= 'openssl s_client -showcerts -servername ' + snDom + ' -connect ' + ipAddy + ':' + portStr + ' < /dev/null 2>&1 | openssl x509 -text | sed "s:^[ \\t]*::"'
+            xArray = subprocess.Popen(xRun, stdout=subprocess.PIPE, shell=True).communicate()[0].split('\n')
+            naRegex = re.compile(r'Not After.*')
+            notAfter = ':'.join(list(filter(naRegex.match, xArray))[-1].split(':')[1:])
+            dnsRegex = re.compile(r'DNS:.*')
+            dnsHostArr = list(filter(dnsRegex.match, xArray))[-1].replace("DNS:", "").split(' ')
+            isValid = 'Invalid'
+            for val in dnsHostArr:
+                if val == snDom:
+                    isValid = '  Valid' 
+	    sslExp.append(portStr + " : " + isValid + " -" + notAfter)
 	print
+	print(sslFrm % ('', 'File :          ' + fileCert))
+	for portCheck in sslExp:
+	    print(sslFrm % ('', portCheck))
+    else:
+	print("--SSL Not Enabled--")
+    print
 
 getAddr(foundHost)
 getUser(foundHost)
