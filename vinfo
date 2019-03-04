@@ -134,7 +134,7 @@ def getCert(hostIn):
 	sslExp = list()
 	for port in [443, 465, 993, 995]: 
             # grabs entirety of openssl x509 output for each port
-	    portStr = str(port)
+	    portStr = str(port) + ' '
             xRun= 'openssl s_client -showcerts -servername ' + snDom + ' -connect ' + ipAddy + ':' + portStr + ' < /dev/null 2>&1 | openssl x509 -text | sed "s:^[ \\t]*::"'
             xArray = subprocess.Popen(xRun, stdout=subprocess.PIPE, shell=True).communicate()[0].split('\n')
 
