@@ -73,6 +73,18 @@ def getAddr(hostIn, mode = 'display'):
 		return 'Invalid Mode'
 	print
 
+def getUser(hostIn):
+	usMatch  = re.compile(r'\s{4}PassengerUser.*')
+	docRoot = list(filter(usMatch.match, hostIn))[-1].split(' ')[-1]
+	print(frmStr % ('User', docRoot))
+	print
+
+def getRoot(hostIn):
+	drMatch  = re.compile(r'\s{2}DocumentRoot.*')
+	docRoot = list(filter(drMatch.match, hostIn))[-1].split(' ')[-1]
+	print(frmStr % ('Doc Root', docRoot))
+	print
+
 def getDomains(hostIn):
 	domMatch = re.compile(r'\s{2}Server(Name|Alias).*')
 	domains = list(filter(domMatch.match, hostIn))
@@ -85,11 +97,6 @@ def getDomains(hostIn):
 	for dom in domList:
 		print(frmStr % (desc, dom))
 		desc = ''
-	print
-def getRoot(hostIn):
-	drMatch  = re.compile(r'\s{2}DocumentRoot.*')
-	docRoot = list(filter(drMatch.match, hostIn))[-1].split(' ')[-1]
-	print(frmStr % ('Doc Root', docRoot))
 	print
 
 def getCert(hostIn):
@@ -116,6 +123,7 @@ def getCert(hostIn):
 	print
 
 getAddr(foundHost)
+getUser(foundHost)
 getRoot(foundHost)
 getDomains(foundHost)
 getCert(foundHost)
