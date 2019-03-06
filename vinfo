@@ -39,7 +39,7 @@ def addNulls (intIn):
 	
 frmStr = "%-13s: %5s"
 
-search = sys.argv[1]
+search = sys.argv[-1]
 
 # retrieve whole httpd.conf
 if os.path.isdir('/etc/apache2/conf'):
@@ -67,7 +67,7 @@ check = [i for i, x in enumerate(vhost) if x == found][-1]
 vbegin = check
 vend = check
 
-# matched opening and closing vhost tag 
+# match opening and closing vhost tag 
 vline = re.compile(r'</?VirtualHost.*?>')
 
 # determine beginning of desired vhost
@@ -97,6 +97,7 @@ def getAddr(hostIn, mode = 'display'):
     ipAddr = list(filter(ipMatch.match, hostIn))[-1].split(' ')[-1].split(':')[0]
     if mode == 'display':
         print(frmStr % ('IP', ipAddr))
+        print
 
     elif mode == 'return':
     	return ipAddr
@@ -104,7 +105,6 @@ def getAddr(hostIn, mode = 'display'):
     else:
     	return 'Invalid Mode'
 
-    print
 
 def getUser(hostIn):
     usMatch  = re.compile(r'\s{4}PassengerUser.*')
@@ -222,5 +222,3 @@ getUser(foundHost)
 getRoot(foundHost)
 getDomains(foundHost)
 getCert(foundHost)
-
-# stage devel
