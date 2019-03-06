@@ -14,6 +14,28 @@ import subprocess
 
 def isset (varIn):
     return varIn in locals() or varIn in globals()
+
+def getMonth (monthIn):
+    return{
+            'Jan' : 1,
+            'Feb' : 2,
+            'Mar' : 3,
+            'Apr' : 4,
+            'May' : 5,
+            'Jun' : 6,
+            'Jul' : 7,
+            'Aug' : 8,
+            'Sep' : 9,
+            'Oct' : 10,
+            'Nov' : 11,
+            'Dec' : 12
+    }[monthIn]
+
+def addNulls (intIn):
+    if intIn < 10:
+        return 0 + intIn
+    else:
+        return intIn
 	
 frmStr = "%-13s: %5s"
 
@@ -124,10 +146,6 @@ def getCert(hostIn):
         ipAddy = getAddr(hostIn, 'return')
         sslFrm = "%-6s  %5s"
 
-        # grab expiration date of cert file
-        runFile = 'sudo cat ' + certFile + ' | openssl x509 -text | grep -Eo "Not After\s:.+\\b" | cut -d: -f2-5 | tr \'\n\' \' \''
-	fileCert = subprocess.Popen(runFile, stdout=subprocess.PIPE, shell=True).communicate()[0]
-
         # selects domain for openssl tests
         # if docroot is used, grabs domain from cert file path 
         # specified domain used if domain used 
@@ -139,16 +157,37 @@ def getCert(hostIn):
         # compiles list of SSL expiration dates on all applicable ports 
         # "Valid" if domain specified is included in "DNS" names from openssl
 	sslExp = list()
-	for port in [443, 465, 993, 995]: 
+	for port in ['File', 443, 465, 993, 995]: 
             # grabs entirety of openssl x509 output for each port
-	    portStr = str(port) + ' '
-            xRun= 'openssl s_client -showcerts -servername ' + snDom + ' -connect ' + ipAddy + ':' + portStr + ' < /dev/null 2>&1 | openssl x509 -text | sed "s:^[ \\t]*::"'
+            
+            if port == 'File':
+		portStr = port
+                xRun = 'sudo cat ' + certFile + ' | openssl x509 -text | sed "s:^[ \\t]*::"'
+            else:
+		portStr = str(port) + ' ' 
+                xRun = 'openssl s_client -showcerts -servername ' + snDom + ' -connect ' + ipAddy + ':' + portStr + ' < /dev/null 2>&1 | openssl x509 -text | sed "s:^[ \\t]*::"'
             xArray = subprocess.Popen(xRun, stdout=subprocess.PIPE, shell=True).communicate()[0].split('\n')
 
             dnsRegex = re.compile(r'DNS:.*')
             naRegex = re.compile(r'Not After.*')
 
+            # retrieves "Not After" (expiration) from openssl x509 
             notAfter = ':'.join(list(filter(naRegex.match, xArray))[-1].split(':')[1:])
+            dateArr = notAfter.split(' ')
+
+            # concatenate date from openssl while converting 3 letter date code to 2 digit int
+            # certdate = YearMonthDayHourMinuteSecond (YYYYmmddHHMMSS) in GMT (openssl default)
+            if dateArr[2] == '':
+                certDate = dateArr[5] + str(addNulls(getMonth(dateArr[1]))) + str(addNulls(dateArr[3])) + dateArr[4].replace(":", "")
+            else:
+                certDate = dateArr[4] + str(addNulls(getMonth(dateArr[1]))) + str(dateArr[2]) + dateArr[4].replace(":", "")
+
+            # retrieves current datetime from system in GMT
+            # system used for portability, servers don't have pytz installed by default
+            dateCom = 'TZ=GMT date "+%Y%m%d%H%M%S"'
+            curDate = subprocess.Popen(dateCom, stdout=subprocess.PIPE, shell=True).communicate()[0]
+
+            # creates list of all SANs from openssl x509 
             dnsHostArr = list(filter(dnsRegex.match, xArray))[-1].replace("DNS:", "").replace(",", "").split(' ')
 
             # check specified domain against list of DNS names from openssl
@@ -157,10 +196,12 @@ def getCert(hostIn):
             for val in dnsHostArr:
                 if val == snDom:
                     isValid = '  Valid' 
+
+            if curDate > certDate:
+                isValid = 'Expired'
                         
 	    sslExp.append(portStr + " : " + isValid + " -" + notAfter)
 	print
-	print(sslFrm % ('', 'File :          ' + fileCert))
 	for portCheck in sslExp:
 	    print(sslFrm % ('', portCheck))
 
