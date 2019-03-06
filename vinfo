@@ -166,9 +166,11 @@ def getCert(hostIn):
             else:
 		portStr = str(port) + ' ' 
                 xRun = 'openssl s_client -showcerts -servername ' + snDom + ' -connect ' + ipAddy + ':' + portStr + ' < /dev/null 2>&1 | openssl x509 -text | sed "s:^[ \\t]*::"'
+
             xArray = subprocess.Popen(xRun, stdout=subprocess.PIPE, shell=True).communicate()[0].split('\n')
 
             dnsRegex = re.compile(r'DNS:.*')
+            comRegex = re.compile(r'Subject:?\sCN\s?=\s?[a-z0-9\.\-]+')
             naRegex = re.compile(r'Not After.*')
 
             # retrieves "Not After" (expiration) from openssl x509 
@@ -188,10 +190,15 @@ def getCert(hostIn):
             curDate = subprocess.Popen(dateCom, stdout=subprocess.PIPE, shell=True).communicate()[0]
 
             # creates list of all SANs from openssl x509 
-            dnsHostArr = list(filter(dnsRegex.match, xArray))[-1].replace("DNS:", "").replace(",", "").split(' ')
-
-            # check specified domain against list of DNS names from openssl
-            # returns "Valid" if name is found
+	    # if no SANs found, CN is used
+            if len(filter(dnsRegex.match, xArray)) == 0:
+		dnsHostArr[0] = re.search(comRegex, filter(comRegex.match, xArray)[-1]).group(0).split("=")[-1]
+	    else:
+            	dnsHostArr = list(filter(dnsRegex.match, xArray))[-1].replace("DNS:", "").replace(",", "").split(' ')
+		
+            # Invalid is default state, changed to valid if domain name is listed on the cert
+            #      --then--
+            # if current datetime is past datetime from cert, status set to Expired
             isValid = 'Invalid'
             for val in dnsHostArr:
                 if val == snDom:
