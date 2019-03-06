@@ -20,7 +20,11 @@ frmStr = "%-13s: %5s"
 search = sys.argv[1]
 
 # retrieve whole httpd.conf
-getConf = 'sudo cat /etc/apache2/conf/httpd.conf'
+if os.path.isdir('/etc/apache2/conf'):
+    getConf = 'sudo cat /etc/apache2/conf/httpd.conf'
+else:
+    getConf = 'sudo cat /etc/httpd/conf/httpd.conf'
+
 conf = subprocess.Popen(getConf, stdout=subprocess.PIPE, shell=True).communicate()[0]
 
 # convert httpd.conf into list by line
