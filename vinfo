@@ -39,7 +39,7 @@ def addNulls (intIn):
 	
 frmStr = "%-13s: %5s"
 
-search = sys.argv[1]
+search = sys.argv[-1]
 
 # retrieve whole httpd.conf
 if os.path.isdir('/etc/apache2/conf'):
@@ -67,7 +67,7 @@ check = [i for i, x in enumerate(vhost) if x == found][-1]
 vbegin = check
 vend = check
 
-# matched opening and closing vhost tag 
+# match opening and closing vhost tag 
 vline = re.compile(r'</?VirtualHost.*?>')
 
 # determine beginning of desired vhost
@@ -97,6 +97,7 @@ def getAddr(hostIn, mode = 'display'):
     ipAddr = list(filter(ipMatch.match, hostIn))[-1].split(' ')[-1].split(':')[0]
     if mode == 'display':
         print(frmStr % ('IP', ipAddr))
+        print
 
     elif mode == 'return':
     	return ipAddr
@@ -104,7 +105,6 @@ def getAddr(hostIn, mode = 'display'):
     else:
     	return 'Invalid Mode'
 
-    print
 
 def getUser(hostIn):
     usMatch  = re.compile(r'\s{4}PassengerUser.*')
@@ -118,7 +118,7 @@ def getRoot(hostIn):
     print(frmStr % ('Doc Root', docRoot))
     print
 
-def getDomains(hostIn):
+def getDoms(hostIn):
     domMatch = re.compile(r'\s{2}Server(Name|Alias).*')
     domains = list(filter(domMatch.match, hostIn))
     
@@ -158,8 +158,8 @@ def getCert(hostIn):
         # "Valid" if domain specified is included in "DNS" names from openssl
 	sslExp = list()
 	for port in ['File', 443, 465, 993, 995]: 
-            # grabs entirety of openssl x509 output for each port
             
+            # grabs entirety of openssl x509 output for each port
             if port == 'File':
 		portStr = port
                 xRun = 'sudo cat ' + certFile + ' | openssl x509 -text | sed "s:^[ \\t]*::"'
@@ -169,13 +169,13 @@ def getCert(hostIn):
 
             xArray = subprocess.Popen(xRun, stdout=subprocess.PIPE, shell=True).communicate()[0].split('\n')
 
-            dnsRegex = re.compile(r'DNS:.*')
             comRegex = re.compile(r'Subject:?\sCN\s?=\s?[a-z0-9\.\-]+')
-            naRegex = re.compile(r'Not After.*')
+            naRegex  = re.compile(r'Not After.*')
+            dnsRegex = re.compile(r'DNS:.*')
 
             # retrieves "Not After" (expiration) from openssl x509 
             notAfter = ':'.join(list(filter(naRegex.match, xArray))[-1].split(':')[1:])
-            dateArr = notAfter.split(' ')
+            dateArr  = notAfter.split(' ')
 
             # concatenate date from openssl while converting 3 letter date code to 2 digit int
             # certdate = YearMonthDayHourMinuteSecond (YYYYmmddHHMMSS) in GMT (openssl default)
@@ -220,7 +220,10 @@ def getCert(hostIn):
 getAddr(foundHost)
 getUser(foundHost)
 getRoot(foundHost)
-getDomains(foundHost)
+getDoms(foundHost)
 getCert(foundHost)
+<<<<<<< HEAD
 
 # stage opt
+=======
+>>>>>>> devel
