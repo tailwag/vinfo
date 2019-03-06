@@ -222,4 +222,3 @@ getUser(foundHost)
 getRoot(foundHost)
 getDomains(foundHost)
 getCert(foundHost)
-
