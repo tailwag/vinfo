@@ -222,8 +222,5 @@ getUser(foundHost)
 getRoot(foundHost)
 getDoms(foundHost)
 getCert(foundHost)
-<<<<<<< HEAD
 
 # stage opt
-=======
->>>>>>> devel
