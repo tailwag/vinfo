@@ -255,7 +255,7 @@ if args.c:
     getFile(foundHost)
 
 if args.s:
-    if not args.P:
+    if not args.port:
         getCert(foundHost)
     else:
         portStr = args.port
