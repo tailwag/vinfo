@@ -10,6 +10,7 @@
 import os 
 import re
 import sys 
+import argparse
 import subprocess
 
 def isset (varIn):
@@ -217,10 +218,26 @@ def getCert(hostIn):
 
     print
 
-getAddr(foundHost)
-getUser(foundHost)
-getRoot(foundHost)
-getDoms(foundHost)
-getCert(foundHost)
+parser = argparse.ArgumentParser(prefix_chars='-')
+parser.add_argument("-a", help="retrieve ip address of site / all sites associated with docroot", action="store_true")
+parser.add_argument("-d", help="retrieve list of domains for given docroot", action="store_true")
+parser.add_argument("-r", help="retrieve the docroot for a given domain", action="store_true")
+parser.add_argument("-s", help="retrieve SSL information for a given domain / docroot", action="store_true")
+parser.add_argument("-u", help="retrieve the user which owns the site / docroot", action="store_true")
 
-# stage opt
+args, unknown = parser.parse_known_args()
+
+if args.a:
+    getAddr(foundHost)
+
+if args.u:
+    getUser(foundHost)
+
+if args.r:
+    getRoot(foundHost)
+
+if args.d:
+    getDoms(foundHost)
+
+if args.s:
+    getCert(foundHost)
