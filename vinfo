@@ -136,11 +136,21 @@ def getDoms(hostIn):
 
     print
 
-def getCert(hostIn):
+def getFile(hostIn):
     certMatch = re.compile(r'\s{4}SSLCertificateFile.*')
     if len(filter(certMatch.match, hostIn)) > 0:
         certFile = list(filter(certMatch.match, hostIn))[-1].split(' ')[-1]
         print(frmStr % ('Certificate', certFile))
+    else:
+        sslWarn = True
+        print("--SSL Not Enabled--")
+
+    print
+
+def getCert(hostIn, ports = ['File', '443', '465', '993', '995']):
+    certMatch = re.compile(r'\s{4}SSLCertificateFile.*')
+    if len(filter(certMatch.match, hostIn)) > 0:
+        certFile = list(filter(certMatch.match, hostIn))[-1].split(' ')[-1]
 
         # uses previously defined ip function to return site's IP 
         # used in openssl "connect" statement
@@ -158,7 +168,7 @@ def getCert(hostIn):
         # compiles list of SSL expiration dates on all applicable ports 
         # "Valid" if domain specified is included in "DNS" names from openssl
 	sslExp = list()
-	for port in ['File', 443, 465, 993, 995]: 
+	for port in ports: 
             
             # grabs entirety of openssl x509 output for each port
             if port == 'File':
@@ -209,20 +219,22 @@ def getCert(hostIn):
                 isValid = 'Expired'
                         
 	    sslExp.append(portStr + " : " + isValid + " -" + notAfter)
-	print
 	for portCheck in sslExp:
 	    print(sslFrm % ('', portCheck))
-
+        print
     else:
-	print("--SSL Not Enabled--")
+        if not isset("sslWarn"):
+	    print("--SSL Not Enabled--")
+            print
 
-    print
 
 parser = argparse.ArgumentParser(prefix_chars='-')
 parser.add_argument("-a", help="retrieve ip address of site / all sites associated with docroot", action="store_true")
+parser.add_argument("-c", help="retrieve the location of the SSL cert file used by apache", action="store_true")
 parser.add_argument("-d", help="retrieve list of domains for given docroot", action="store_true")
 parser.add_argument("-r", help="retrieve the docroot for a given domain", action="store_true")
 parser.add_argument("-s", help="retrieve SSL information for a given domain / docroot", action="store_true")
+parser.add_argument("-P", help="used with -s to specify service / port to run checks. supports comma separated input. options: file,http,smtp,imap,pop3", dest="port")
 parser.add_argument("-u", help="retrieve the user which owns the site / docroot", action="store_true")
 
 args, unknown = parser.parse_known_args()
@@ -239,8 +251,20 @@ if args.r:
 if args.d:
     getDoms(foundHost)
 
+if args.c:
+    getFile(foundHost)
+
 if args.s:
-    getCert(foundHost)
+    if not args.P:
+        getCert(foundHost)
+    else:
+        portStr = args.port
+        portStr.replace("file", "File")
+        portStr.replace("http", "443")
+        portStr.replace("smtp", "465")
+        portStr.replace("imap", "993")
+        portStr.replace("pop3", "995")
+        getCert(foundHost, portStr.split(","))
 
 default = True
 for check in args.__dict__:
@@ -252,4 +276,5 @@ if default:
     getUser(foundHost)
     getRoot(foundHost)
     getDoms(foundHost)
+    getFile(foundHost)
     getCert(foundHost)
