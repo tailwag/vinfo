@@ -3,15 +3,16 @@
 # vInfo - Devin Shoemaker 2019-03-03
 # retrieves information about specific vhosts on cPanel servers
 # https://github.com/tailwag/vinfo
-# usage:
-#       $ vinfo example.com
-#       $ vinfo /home/user/public_html
+#
+# `vinfo -h` for usage
 
 import os 
 import re
 import sys 
 import argparse
 import subprocess
+
+frmStr = "%-13s: %5s"
 
 def isset (varIn):
     return varIn in locals() or varIn in globals()
@@ -38,60 +39,63 @@ def addNulls (intIn):
     else:
         return intIn
 	
-frmStr = "%-13s: %5s"
-
-search = sys.argv[-1]
-
-# retrieve whole httpd.conf
-if os.path.isdir('/etc/apache2/conf'):
-    getConf = 'sudo cat /etc/apache2/conf/httpd.conf'
-else:
-    getConf = 'sudo cat /etc/httpd/conf/httpd.conf'
-
-conf = subprocess.Popen(getConf, stdout=subprocess.PIPE, shell=True).communicate()[0]
-
-# convert httpd.conf into list by line
-vhost = conf.split('\n')
-
-# define regex for searching by domanin name 
-if os.path.isdir(search):
-    serverna = re.compile(r'\s{2}DocumentRoot\s'+search)
-else:
-    serverna = re.compile(r'\s{2}Server(Name|Alias).*?\s'+search+'.*?')
-
-# return line searched for 
-found = list(filter(serverna.match, vhost))[-1]
-
-# get line number of returned line
-check = [i for i, x in enumerate(vhost) if x == found][-1]
-
-vbegin = check
-vend = check
-
-# match opening and closing vhost tag 
-vline = re.compile(r'</?VirtualHost.*?>')
-
-# determine beginning of desired vhost
-while vbegin <= check:
-    grep = vline.search(vhost[vbegin])
-    if grep != None:
-        break
-    vbegin -= 1
-
-# determine end of desired vhost
-while vend >= check:
-    grep = vline.search(vhost[vend])
-    if grep != None:
-        break
-    vend += 1
-
-prog = vbegin
-
-# add each line of desired vhost to a list
-foundHost = []
-while prog <= vend:
-    foundHost.append(vhost[prog])
-    prog += 1
+def getHost (searchString, mode = 'array'):
+    
+    # retrieve whole httpd.conf
+    if os.path.isdir('/etc/apache2/conf'):
+        getConf = 'sudo cat /etc/apache2/conf/httpd.conf'
+    else:
+        getConf = 'sudo cat /etc/httpd/conf/httpd.conf'
+    
+    conf = subprocess.Popen(getConf, stdout=subprocess.PIPE, shell=True).communicate()[0]
+    
+    # convert httpd.conf into list by line
+    vhost = conf.split('\n')
+    
+    # define regex for searching by domanin name 
+    if os.path.isdir(searchString):
+        serverna = re.compile(r'\s{2}DocumentRoot\s' + searchString)
+    else:
+        serverna = re.compile(r'\s{2}Server(Name|Alias).*?\s' + searchString + '.*?')
+    
+    # return line searched for 
+    found = list(filter(serverna.match, vhost))[-1]
+    
+    # get line number of returned line
+    check = [i for i, x in enumerate(vhost) if x == found][-1]
+    
+    vbegin = check
+    vend = check
+    
+    # match opening and closing vhost tag 
+    vline = re.compile(r'</?VirtualHost.*?>')
+    
+    # determine beginning of desired vhost
+    while vbegin <= check:
+        grep = vline.search(vhost[vbegin])
+        if grep != None:
+            break
+        vbegin -= 1
+    
+    # determine end of desired vhost
+    while vend >= check:
+        grep = vline.search(vhost[vend])
+        if grep != None:
+            break
+        vend += 1
+    
+    prog = vbegin
+    
+    # add each line of desired vhost to a list
+    foundHost = []
+    while prog <= vend:
+        foundHost.append(vhost[prog])
+        prog += 1
+    
+    if mode == 'display':
+        print("\n".join(foundHost))
+    elif mode == 'array':
+        return foundHost
 
 def getAddr(hostIn, mode = 'display'):
     ipMatch  = re.compile(r'<VirtualHost [0-2]?[0-9]{1,2}(\.[0-2]?[0-9]{1,2}){3}:(80|443)>')
@@ -99,42 +103,61 @@ def getAddr(hostIn, mode = 'display'):
     if mode == 'display':
         print(frmStr % ('IP', ipAddr))
         print
-
     elif mode == 'return':
     	return ipAddr
 
-    else:
-    	return 'Invalid Mode'
-
-
-def getUser(hostIn):
+def getUser(hostIn, mode = 'display'):
     usMatch  = re.compile(r'\s{4}PassengerUser.*')
-    docRoot = list(filter(usMatch.match, hostIn))[-1].split(' ')[-1]
-    print(frmStr % ('User', docRoot))
-    print
+    usrName = list(filter(usMatch.match, hostIn))[-1].split(' ')[-1]
+    if mode == 'display':
+        print(frmStr % ('User', usrName))
+        print
+    elif mode == 'return':
+        return usrName
 
-def getRoot(hostIn):
+def getRoot(hostIn, mode = 'display'):
     drMatch  = re.compile(r'\s{2}DocumentRoot.*')
     docRoot = list(filter(drMatch.match, hostIn))[-1].split(' ')[-1]
-    print(frmStr % ('Doc Root', docRoot))
-    print
+    if mode == 'display':   
+        print(frmStr % ('Doc Root', docRoot))
+        print
+    elif mode == 'return':
+        return docRoot
 
-def getDoms(hostIn):
-    domMatch = re.compile(r'\s{2}Server(Name|Alias).*')
-    domains = list(filter(domMatch.match, hostIn))
+def getDoms(hostIn, mode = 'display', domtype = 'all'):
+    priMatch = re.compile(r'\s{2}ServerName.*')
+    secMatch = re.compile(r'\s{2}ServerAlias.*')
     
-    domList  = domains[0].split(' ')[3:]
-    
-    if len(domains) > 1:
-        aliasDom = domains[1].split(' ')[3:]
-        domList.extend(aliasDom)
-    
-    desc = "Domains"
-    for dom in domList:
-    	print(frmStr % (desc, dom))
-    	desc = ''
+    priDom = filter(priMatch.match, hostIn)[0].split(' ')[3:]
+    secDom = []
+    for alias in filter(secMatch.match, hostIn):
+        secDom.extend(alias.split(' ')[3:])
 
-    print
+    allDom = []
+    allDom.extend(priDom)
+    allDom.extend(secDom)
+    
+    if mode == 'display':
+        pre = '    Aliases'
+        if domtype == 'pri':
+            print(frmStr % ('Main Domain', priDom[0]))
+        elif domtype == 'sec':
+            for srvAl in secDom:
+                print(frmStr % (pre, srvAl))
+                pre = ""
+        elif domtype == 'all':
+            print(frmStr % ('Main Domain', priDom[0]))
+            for srvAl in secDom:
+                print(frmStr % (pre, srvAl))
+                pre = ""
+        print
+    elif mode == 'return':
+        if domtype == 'pri':
+            return priDom[0]
+        elif domtype == 'sec':
+            return secDom
+        elif domtype == 'all':
+            return allDom
 
 def getFile(hostIn):
     certMatch = re.compile(r'\s{4}SSLCertificateFile.*')
@@ -161,7 +184,7 @@ def getCert(hostIn, ports = ['File', '443', '465', '993', '995']):
         # if docroot is used, grabs domain from cert file path 
         # specified domain used if domain used 
         if os.path.isdir(search):
-            snDom = certFile.split('/')[5]
+            snDom = getDoms(virtualHost, 'return', 'pri')
         else:
             snDom = search
 
@@ -196,7 +219,7 @@ def getCert(hostIn, ports = ['File', '443', '465', '993', '995']):
                 certDate = dateArr[4] + str(addNulls(getMonth(dateArr[1]))) + str(dateArr[2]) + dateArr[4].replace(":", "")
 
             # retrieves current datetime from system in GMT
-            # system used for portability, servers don't have pytz installed by default
+            # system used for portability, as pytz is not usually installed by default
             dateCom = 'TZ=GMT date "+%Y%m%d%H%M%S"'
             curDate = subprocess.Popen(dateCom, stdout=subprocess.PIPE, shell=True).communicate()[0]
 
@@ -239,32 +262,54 @@ parser.add_argument("-u", help="retrieve the user which owns the site / docroot"
 
 args, unknown = parser.parse_known_args()
 
+errors = ["Error:"]
+if not unknown:
+    errors.append("     -- vinfo requires either a docroot or domain to be specified --\n")
+
+if args.port and not args.s:
+    errors.append("     -P cannot be used without -s\n")
+
+if args.port:
+    portStr = args.port.replace("file", "File").replace("http", "443").replace("smtp", "465").replace("imap", "993").replace("pop3", "995")
+    srvcArr = portStr.split(",")
+    allowedPorts = ['File', '443', '465', '993', '995']
+    die = []
+    for srvc in srvcArr:
+        if srvc not in allowedPorts:
+            die.append(srvc)
+
+    if (len(die) == 1):
+        errors.append("     '" + die[0] + "' is not a valid port or service\n")
+    elif (len(die) >= 1):
+        errors.append("     '" + ', '.join(die) + "' are not valid ports or services\n")
+
+
+if (len(errors) > 1):
+    sys.exit("\n".join(errors))
+
+search = unknown[-1]
+virtualHost = getHost(search)
+
 if args.a:
-    getAddr(foundHost)
+    getAddr(virtualHost)
 
 if args.u:
-    getUser(foundHost)
+    getUser(virtualHost)
 
 if args.r:
-    getRoot(foundHost)
+    getRoot(virtualHost)
 
 if args.d:
-    getDoms(foundHost)
+    getDoms(virtualHost)
 
 if args.c:
-    getFile(foundHost)
+    getFile(virtualHost)
 
 if args.s:
     if not args.port:
-        getCert(foundHost)
+        getCert(virtualHost)
     else:
-        portStr = args.port
-        portStr.replace("file", "File")
-        portStr.replace("http", "443")
-        portStr.replace("smtp", "465")
-        portStr.replace("imap", "993")
-        portStr.replace("pop3", "995")
-        getCert(foundHost, portStr.split(","))
+        getCert(virtualHost, srvcArr)
 
 default = True
 for check in args.__dict__:
@@ -272,9 +317,9 @@ for check in args.__dict__:
         default = False
 
 if default:
-    getAddr(foundHost)
-    getUser(foundHost)
-    getRoot(foundHost)
-    getDoms(foundHost)
-    getFile(foundHost)
-    getCert(foundHost)
+    getAddr(virtualHost)
+    getUser(virtualHost)
+    getRoot(virtualHost)
+    getDoms(virtualHost)
+    getFile(virtualHost)
+    getCert(virtualHost)
