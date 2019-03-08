@@ -259,12 +259,17 @@ parser.add_argument("-r", help="retrieve the docroot for a given domain", action
 parser.add_argument("-s", help="retrieve SSL information for a given domain / docroot", action="store_true")
 parser.add_argument("-P", help="used with -s to specify service / port to run checks. supports comma separated input. options: file,http,smtp,imap,pop3", dest="port")
 parser.add_argument("-u", help="retrieve the user which owns the site / docroot", action="store_true")
+parser.add_argument('search', help="domain or docroot")
+
 
 args, unknown = parser.parse_known_args()
 
 errors = ["Error:"]
-if not unknown:
-    errors.append("     -- vinfo requires either a docroot or domain to be specified --\n")
+if unknown:
+    if len(unknown) == 1:
+        errors.append("     " + ', '.join(unknown) + " not a valid argument\n")
+    else:
+        errors.append("     " + ', '.join(unknown) + " are not valid arguments\n")
 
 if args.port and not args.s:
     errors.append("     -P cannot be used without -s\n")
@@ -287,7 +292,7 @@ if args.port:
 if (len(errors) > 1):
     sys.exit("\n".join(errors))
 
-search = unknown[-1]
+search = args.search
 virtualHost = getHost(search)
 
 if args.a:
@@ -313,7 +318,7 @@ if args.s:
 
 default = True
 for check in args.__dict__:
-    if args.__dict__[check]:
+    if check != 'search' and args.__dict__[check]:
         default = False
 
 if default:
