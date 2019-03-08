@@ -52,14 +52,16 @@ def getHost (searchString, mode = 'array'):
     # convert httpd.conf into list by line
     vhost = conf.split('\n')
     
-    # define regex for searching by domanin name 
-    if os.path.isdir(searchString):
-        serverna = re.compile(r'\s{2}DocumentRoot\s' + searchString)
-    else:
-        serverna = re.compile(r'\s{2}Server(Name|Alias).*?\s' + searchString + '.*?')
+    docSearch = re.compile(r'\s{2}DocumentRoot\s' + searchString)
+    domSearch = re.compile(r'\s{2}Server(Name|Alias).*?\s' + searchString + '.*?')
     
     # return line searched for 
-    found = list(filter(serverna.match, vhost))[-1]
+    if filter(docSearch.match, vhost):
+        found = list(filter(docSearch.match, vhost))[-1]
+    elif filter(domSearch.match, vhost):
+        found = list(filter(domSearch.match, vhost))[-1]
+    else:
+        sys.exit("Error:\n     no vhost found for " + searchString + "\n")
     
     # get line number of returned line
     check = [i for i, x in enumerate(vhost) if x == found][-1]
@@ -93,7 +95,12 @@ def getHost (searchString, mode = 'array'):
         prog += 1
     
     if mode == 'display':
-        print("\n".join(foundHost))
+        lineNo = vbegin
+        for line in foundHost:
+            print(str(lineNo) + " | " + line)
+            lineNo += 1
+    elif mode == 'return':
+        return "\n".join(foundHost)
     elif mode == 'array':
         return foundHost
 
@@ -124,7 +131,8 @@ def getRoot(hostIn, mode = 'display'):
     elif mode == 'return':
         return docRoot
 
-def getDoms(hostIn, mode = 'display', domtype = 'all'):
+def getDoms(hostIn, domtype = 'all', mode = 'display'):
+    domtype = domtype.replace("primary", "pri").replace("secondary", "sec")
     priMatch = re.compile(r'\s{2}ServerName.*')
     secMatch = re.compile(r'\s{2}ServerAlias.*')
     
@@ -150,14 +158,15 @@ def getDoms(hostIn, mode = 'display', domtype = 'all'):
             for srvAl in secDom:
                 print(frmStr % (pre, srvAl))
                 pre = ""
+
         print
     elif mode == 'return':
         if domtype == 'pri':
             return priDom[0]
         elif domtype == 'sec':
-            return secDom
+            return "\n".join(secDom)
         elif domtype == 'all':
-            return allDom
+            return "\n".join(allDom)
 
 def getFile(hostIn):
     certMatch = re.compile(r'\s{4}SSLCertificateFile.*')
@@ -184,7 +193,7 @@ def getCert(hostIn, ports = ['File', '443', '465', '993', '995']):
         # if docroot is used, grabs domain from cert file path 
         # specified domain used if domain used 
         if os.path.isdir(search):
-            snDom = getDoms(virtualHost, 'return', 'pri')
+            snDom = getDoms(virtualHost, 'pri', 'return')
         else:
             snDom = search
 
@@ -192,7 +201,6 @@ def getCert(hostIn, ports = ['File', '443', '465', '993', '995']):
         # "Valid" if domain specified is included in "DNS" names from openssl
 	sslExp = list()
 	for port in ports: 
-            
             # grabs entirety of openssl x509 output for each port
             if port == 'File':
 		portStr = port
@@ -250,17 +258,19 @@ def getCert(hostIn, ports = ['File', '443', '465', '993', '995']):
 	    print("--SSL Not Enabled--")
             print
 
-
 parser = argparse.ArgumentParser(prefix_chars='-')
-parser.add_argument("-a", help="retrieve ip address of site / all sites associated with docroot", action="store_true")
-parser.add_argument("-c", help="retrieve the location of the SSL cert file used by apache", action="store_true")
-parser.add_argument("-d", help="retrieve list of domains for given docroot", action="store_true")
-parser.add_argument("-r", help="retrieve the docroot for a given domain", action="store_true")
-parser.add_argument("-s", help="retrieve SSL information for a given domain / docroot", action="store_true")
-parser.add_argument("-P", help="used with -s to specify service / port to run checks. supports comma separated input. options: file,http,smtp,imap,pop3", dest="port")
-parser.add_argument("-u", help="retrieve the user which owns the site / docroot", action="store_true")
+parser = argparse.ArgumentParser(description="vinfo - Devin Shoemaker 2019 - a tool to gather information \nabout specific virtualhosts on cpanel servers")
+parser.add_argument("-a", "--address", help="retrieve ip address of site / all sites associated with docroot", action="store_true")
+parser.add_argument("-c", "--cert", help="retrieve the location of the SSL cert file used by apache", action="store_true")
+parser.add_argument("-d", "--domain", help="retrieve list of domains for given docroot", action="store_true")
+parser.add_argument("-D", help="used with -d to specify which domains select between servername or serveralias. options: primary, secondary", dest="type")
+parser.add_argument("-g", "--get-host", help="retrieves entire vhost. negates all other options with the exception of --clean", action="store_true")
+parser.add_argument("-r", "--root", help="retrieve the docroot for a given domain", action="store_true")
+parser.add_argument("-s", "--ssl-test", help="retrieve SSL information for a given domain / docroot", action="store_true")
+parser.add_argument("-P", help="used with -s to specify service(s) to run checks. supports comma separated input. options: file,http,smtp,imap,pop3 or file,443,465,993,995", dest="port")
+parser.add_argument("-u", "--user", help="retrieve the user which owns the site / docroot", action="store_true")
+parser.add_argument("--clean", help="return clean output (no formatting)", action="store_true")
 parser.add_argument('search', help="domain or docroot")
-
 
 args, unknown = parser.parse_known_args()
 
@@ -271,7 +281,7 @@ if unknown:
     else:
         errors.append("     " + ', '.join(unknown) + " are not valid arguments\n")
 
-if args.port and not args.s:
+if args.port and not args.ssl_test:
     errors.append("     -P cannot be used without -s\n")
 
 if args.port:
@@ -288,34 +298,67 @@ if args.port:
     elif (len(die) >= 1):
         errors.append("     '" + ', '.join(die) + "' are not valid ports or services\n")
 
-
 if (len(errors) > 1):
     sys.exit("\n".join(errors))
 
 search = args.search
-virtualHost = getHost(search)
 
-if args.a:
-    getAddr(virtualHost)
+if args.clean:
+    output = 'return'
+else:
+    output = 'display'
 
-if args.u:
-    getUser(virtualHost)
-
-if args.r:
-    getRoot(virtualHost)
-
-if args.d:
-    getDoms(virtualHost)
-
-if args.c:
-    getFile(virtualHost)
-
-if args.s:
-    if not args.port:
-        getCert(virtualHost)
+if args.get_host:
+    if args.clean:
+        print getHost(search, output)
     else:
-        getCert(virtualHost, srvcArr)
+        getHost(search, output)
+    sys.exit()
+else:
+    virtualHost = getHost(search)
 
+if args.address:
+    if args.clean:
+        print getAddr(virtualHost, output)
+    else:
+        getAddr(virtualHost)
+
+if args.user:
+    if args.clean:
+        print getUser(virtualHost, output)
+    else:
+        getUser(virtualHost)
+
+if args.root:
+    if args.clean:
+        print getRoot(virtualHost, output)
+    else:
+        getRoot(virtualHost)
+
+if args.domain:
+    if args.clean:
+        if args.type:
+            print getDoms(virtualHost, args.type, output)
+        else:
+            print getDoms(virtualHost, 'all', output)
+    else:
+        if args.type:
+            getDoms(virtualHost, args.type)
+        else:
+            getDoms(virtualHost)
+
+if args.cert:
+    if args.clean:
+        print getFile(virtualHost, output)
+    else:
+        getFile(virtualHost)
+
+if args.ssl_test:
+    if args.port:
+        getCert(virtualHost, srvcArr)
+    else:
+        getCert(virtualHost)
+        
 default = True
 for check in args.__dict__:
     if check != 'search' and args.__dict__[check]:
