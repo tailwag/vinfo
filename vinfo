@@ -242,3 +242,14 @@ if args.d:
 if args.s:
     getCert(foundHost)
 
+default = True
+for check in args.__dict__:
+    if args.__dict__[check]:
+        default = False
+
+if default:
+    getAddr(foundHost)
+    getUser(foundHost)
+    getRoot(foundHost)
+    getDoms(foundHost)
+    getCert(foundHost)
