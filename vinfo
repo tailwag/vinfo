@@ -39,7 +39,7 @@ def addNulls (intIn):
     else:
         return intIn
 	
-def getHost (searchString, mode = 'array'):
+def getHost (searchString, mode = 'starray'):
     
     # retrieve whole httpd.conf
     if os.path.isdir('/etc/apache2/conf'):
@@ -52,8 +52,8 @@ def getHost (searchString, mode = 'array'):
     # convert httpd.conf into list by line
     vhost = conf.split('\n')
     
-    docSearch = re.compile(r'\s{2}DocumentRoot\s' + searchString)
-    domSearch = re.compile(r'\s{2}Server(Name|Alias).*?\s' + searchString + '.*?')
+    docSearch = re.compile(r'\s*?DocumentRoot\s' + searchString)
+    domSearch = re.compile(r'\s*?Server(Name|Alias).*?\s' + searchString + '.*?')
     
     # return line searched for 
     if filter(docSearch.match, vhost):
@@ -90,9 +90,14 @@ def getHost (searchString, mode = 'array'):
     
     # add each line of desired vhost to a list
     foundHost = []
-    while prog <= vend:
-        foundHost.append(vhost[prog])
-        prog += 1
+    if mode == 'starray':
+        while prog <= vend:
+            foundHost.append(vhost[prog].lstrip())
+            prog += 1
+    else: 
+        while prog <= vend:
+            foundHost.append(vhost[prog])
+            prog += 1
     
     if mode == 'display':
         lineNo = vbegin
@@ -101,7 +106,7 @@ def getHost (searchString, mode = 'array'):
             lineNo += 1
     elif mode == 'return':
         return "\n".join(foundHost)
-    elif mode == 'array':
+    elif mode == 'array' or mode == 'starray':
         return foundHost
 
 def getAddr(hostIn, mode = 'display'):
@@ -114,7 +119,7 @@ def getAddr(hostIn, mode = 'display'):
     	return ipAddr
 
 def getUser(hostIn, mode = 'display'):
-    usMatch  = re.compile(r'\s{4}PassengerUser.*')
+    usMatch  = re.compile(r'\s*?PassengerUser.*')
     usrName = list(filter(usMatch.match, hostIn))[-1].split(' ')[-1]
     if mode == 'display':
         print(frmStr % ('User', usrName))
@@ -123,7 +128,7 @@ def getUser(hostIn, mode = 'display'):
         return usrName
 
 def getRoot(hostIn, mode = 'display'):
-    drMatch  = re.compile(r'\s{2}DocumentRoot.*')
+    drMatch  = re.compile(r'\s*?DocumentRoot.*')
     docRoot = list(filter(drMatch.match, hostIn))[-1].split(' ')[-1]
     if mode == 'display':   
         print(frmStr % ('Doc Root', docRoot))
@@ -133,13 +138,13 @@ def getRoot(hostIn, mode = 'display'):
 
 def getDoms(hostIn, domtype = 'all', mode = 'display'):
     domtype = domtype.replace("primary", "pri").replace("secondary", "sec")
-    priMatch = re.compile(r'\s{2}ServerName.*')
-    secMatch = re.compile(r'\s{2}ServerAlias.*')
+    priMatch = re.compile(r'ServerName.*')
+    secMatch = re.compile(r'ServerAlias.*')
     
-    priDom = filter(priMatch.match, hostIn)[0].split(' ')[3:]
+    priDom = filter(priMatch.match, hostIn)[0].split(' ')[1:]
     secDom = []
     for alias in filter(secMatch.match, hostIn):
-        secDom.extend(alias.split(' ')[3:])
+        secDom.extend(alias.split(' ')[1:])
 
     allDom = []
     allDom.extend(priDom)
@@ -169,7 +174,7 @@ def getDoms(hostIn, domtype = 'all', mode = 'display'):
             return "\n".join(allDom)
 
 def getFile(hostIn, mode = 'display'):
-    certMatch = re.compile(r'\s{4}SSLCertificateFile.*')
+    certMatch = re.compile(r'\s*?SSLCertificateFile.*')
     if len(filter(certMatch.match, hostIn)) > 0:
         certFile = list(filter(certMatch.match, hostIn))[-1].split(' ')[-1]
         if mode == 'display':
@@ -184,7 +189,7 @@ def getFile(hostIn, mode = 'display'):
             print
 
 def getCert(hostIn, ports = ['File', '443', '465', '993', '995']):
-    certMatch = re.compile(r'\s{4}SSLCertificateFile.*')
+    certMatch = re.compile(r'\s*?SSLCertificateFile.*')
     if len(filter(certMatch.match, hostIn)) > 0:
         certFile = list(filter(certMatch.match, hostIn))[-1].split(' ')[-1]
 
