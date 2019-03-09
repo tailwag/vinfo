@@ -215,7 +215,7 @@ def getCert(hostIn, ports = ['File', '443', '465', '993', '995']):
 
             xArray = subprocess.Popen(xRun, stdout=subprocess.PIPE, shell=True).communicate()[0].split('\n')
 
-            comRegex = re.compile(r'Subject:?\sCN\s?=\s?[a-z0-9\.\-]+')
+            comRegex = re.compile(r'Subject\s?:?.*CN\s?=\s?[a-z0-9\.\-]+')
             naRegex  = re.compile(r'Not After.*')
             dnsRegex = re.compile(r'DNS:.*')
 
@@ -235,10 +235,11 @@ def getCert(hostIn, ports = ['File', '443', '465', '993', '995']):
             dateCom = 'TZ=GMT date "+%Y%m%d%H%M%S"'
             curDate = subprocess.Popen(dateCom, stdout=subprocess.PIPE, shell=True).communicate()[0]
 
+            dnsHostArr = []
             # creates list of all SANs from openssl x509 
 	    # if no SANs found, CN is used
             if len(filter(dnsRegex.match, xArray)) == 0:
-		dnsHostArr[0] = re.search(comRegex, filter(comRegex.match, xArray)[-1]).group(0).split("=")[-1]
+		dnsHostArr.append(re.search(comRegex, filter(comRegex.match, xArray)[-1]).group(0).split("=")[-1])
 	    else:
             	dnsHostArr = list(filter(dnsRegex.match, xArray))[-1].replace("DNS:", "").replace(",", "").split(' ')
 		
