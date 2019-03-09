@@ -168,16 +168,20 @@ def getDoms(hostIn, domtype = 'all', mode = 'display'):
         elif domtype == 'all':
             return "\n".join(allDom)
 
-def getFile(hostIn):
+def getFile(hostIn, mode = 'display'):
     certMatch = re.compile(r'\s{4}SSLCertificateFile.*')
     if len(filter(certMatch.match, hostIn)) > 0:
         certFile = list(filter(certMatch.match, hostIn))[-1].split(' ')[-1]
-        print(frmStr % ('Certificate', certFile))
+        if mode == 'display':
+            print(frmStr % ('Certificate', certFile))
+            print
+        elif mode == 'return':
+            return certFile
     else:
-        sslWarn = True
-        print("--SSL Not Enabled--")
-
-    print
+        if mode == 'display':
+            sslWarn = True
+            print("--SSL Not Enabled--")
+            print
 
 def getCert(hostIn, ports = ['File', '443', '465', '993', '995']):
     certMatch = re.compile(r'\s{4}SSLCertificateFile.*')
@@ -283,6 +287,14 @@ if unknown:
 
 if args.port and not args.ssl_test:
     errors.append("     -P cannot be used without -s\n")
+
+if args.type and not args.domain:
+    errors.append("     -D cannot be used without -d\n")
+
+if args.type and args.type not in ['primary', 'pri', 'secondary', 'sec', 'all']:
+    errors.append("     Supported options for -D are:")
+    errors.append("         primary (pri)")
+    errors.append("         secondary (sec))\n")
 
 if args.port:
     portStr = args.port.replace("file", "File").replace("http", "443").replace("smtp", "465").replace("imap", "993").replace("pop3", "995")
