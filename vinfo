@@ -226,15 +226,16 @@ def getFile(hostIn, service = 'all', mode = 'display'):
             print("--SSL Not Enabled--")
             print
 
-def getCert(hostIn, ports = ['File', '443', '465', '993', '995']):
+def getCert(hostIn, ports = ['apache', 'mail', '443', '465', '993', '995']):
     certMatch = re.compile(r'\s*?SSLCertificateFile.*')
     if len(filter(certMatch.match, hostIn)) > 0:
-        certFile = list(filter(certMatch.match, hostIn))[-1].split(' ')[-1]
+        httpCert = getFile(hostIn, 'web', 'return')
+        mailCert = getFile(hostIn, 'mail', 'return')
 
         # uses previously defined ip function to return site's IP 
         # used in openssl "connect" statement
         ipAddy = getAddr(hostIn, 'return')
-        sslFrm = "%-6s  %5s"
+        sslFrm = "%-4s  %5s"
 
         # selects domain for openssl tests
         # if docroot is used, grabs domain from cert file path 
@@ -249,55 +250,61 @@ def getCert(hostIn, ports = ['File', '443', '465', '993', '995']):
 	sslExp = list()
 	for port in ports: 
             # grabs entirety of openssl x509 output for each port
-            if port == 'File':
-		portStr = port
-                xRun = 'sudo cat ' + certFile + ' | openssl x509 -text | sed "s:^[ \\t]*::"'
+            if port == 'apache':
+		portStr = port.capitalize()
+                xRun = 'sudo cat ' + httpCert + ' | openssl x509 -text | sed "s:^[ \\t]*::"'
+            elif port == 'mail':
+                if mailCert:
+		    portStr = '  ' + port.capitalize()
+                    xRun = 'sudo cat ' + mailCert + ' | openssl x509 -text | sed "s:^[ \\t]*::"'
+                else:
+                    portStr = False
             else:
-		portStr = str(port) + ' ' 
+		portStr = str(port) + ' '
                 xRun = 'openssl s_client -showcerts -servername ' + snDom + ' -connect ' + ipAddy + ':' + portStr + ' < /dev/null 2>&1 | openssl x509 -text | sed "s:^[ \\t]*::"'
+                portStr = '   ' + str(port)
+            if portStr:
+                xArray = subprocess.Popen(xRun, stdout=subprocess.PIPE, shell=True).communicate()[0].split('\n')
+                comRegex = re.compile(r'Subject\s?:?.*CN\s?=\s?[a-z0-9\.\-]+')
+                naRegex  = re.compile(r'Not After.*')
+                dnsRegex = re.compile(r'DNS:.*')
 
-            xArray = subprocess.Popen(xRun, stdout=subprocess.PIPE, shell=True).communicate()[0].split('\n')
+                # retrieves "Not After" (expiration) from openssl x509 
+                notAfter = ':'.join(list(filter(naRegex.match, xArray))[-1].split(':')[1:])
+                dateArr  = notAfter.split(' ')
 
-            comRegex = re.compile(r'Subject\s?:?.*CN\s?=\s?[a-z0-9\.\-]+')
-            naRegex  = re.compile(r'Not After.*')
-            dnsRegex = re.compile(r'DNS:.*')
+                # concatenate date from openssl while converting 3 letter date code to 2 digit int
+                # certdate = YearMonthDayHourMinuteSecond (YYYYmmddHHMMSS) in GMT (openssl default)
+                if dateArr[2] == '':
+                    certDate = dateArr[5] + str(addNulls(getMonth(dateArr[1]))) + str(addNulls(dateArr[3])) + dateArr[4].replace(":", "")
+                else:
+                    certDate = dateArr[4] + str(addNulls(getMonth(dateArr[1]))) + str(dateArr[2]) + dateArr[4].replace(":", "")
 
-            # retrieves "Not After" (expiration) from openssl x509 
-            notAfter = ':'.join(list(filter(naRegex.match, xArray))[-1].split(':')[1:])
-            dateArr  = notAfter.split(' ')
+                # retrieves current datetime from system in GMT
+                # system used for portability, as pytz is not usually installed by default
+                dateCom = 'TZ=GMT date "+%Y%m%d%H%M%S"'
+                curDate = subprocess.Popen(dateCom, stdout=subprocess.PIPE, shell=True).communicate()[0]
 
-            # concatenate date from openssl while converting 3 letter date code to 2 digit int
-            # certdate = YearMonthDayHourMinuteSecond (YYYYmmddHHMMSS) in GMT (openssl default)
-            if dateArr[2] == '':
-                certDate = dateArr[5] + str(addNulls(getMonth(dateArr[1]))) + str(addNulls(dateArr[3])) + dateArr[4].replace(":", "")
-            else:
-                certDate = dateArr[4] + str(addNulls(getMonth(dateArr[1]))) + str(dateArr[2]) + dateArr[4].replace(":", "")
+                dnsHostArr = []
+                # creates list of all SANs from openssl x509 
+	        # if no SANs found, CN is used
+                if len(filter(dnsRegex.match, xArray)) == 0:
+	            dnsHostArr.append(re.search(comRegex, filter(comRegex.match, xArray)[-1]).group(0).split("=")[-1])
+	        else:
+                    dnsHostArr = list(filter(dnsRegex.match, xArray))[-1].replace("DNS:", "").replace(",", "").split(' ')
+	            
+                # Invalid is default state, changed to valid if domain name is listed on the cert
+                #      --then--
+                # if current datetime is past datetime from cert, status set to Expired
+                isValid = 'Invalid'
+                for val in dnsHostArr:
+                    if val == snDom:
+                        isValid = '  Valid' 
 
-            # retrieves current datetime from system in GMT
-            # system used for portability, as pytz is not usually installed by default
-            dateCom = 'TZ=GMT date "+%Y%m%d%H%M%S"'
-            curDate = subprocess.Popen(dateCom, stdout=subprocess.PIPE, shell=True).communicate()[0]
-
-            dnsHostArr = []
-            # creates list of all SANs from openssl x509 
-	    # if no SANs found, CN is used
-            if len(filter(dnsRegex.match, xArray)) == 0:
-		dnsHostArr.append(re.search(comRegex, filter(comRegex.match, xArray)[-1]).group(0).split("=")[-1])
-	    else:
-            	dnsHostArr = list(filter(dnsRegex.match, xArray))[-1].replace("DNS:", "").replace(",", "").split(' ')
-		
-            # Invalid is default state, changed to valid if domain name is listed on the cert
-            #      --then--
-            # if current datetime is past datetime from cert, status set to Expired
-            isValid = 'Invalid'
-            for val in dnsHostArr:
-                if val == snDom:
-                    isValid = '  Valid' 
-
-            if curDate > certDate:
-                isValid = 'Expired'
-                        
-	    sslExp.append(portStr + " : " + isValid + " -" + notAfter)
+                if curDate > certDate:
+                    isValid = 'Expired'
+                            
+	        sslExp.append(portStr + " : " + isValid + " -" + notAfter)
 	for portCheck in sslExp:
 	    print(sslFrm % ('', portCheck))
         print
@@ -351,9 +358,9 @@ if args.port and not args.ssl_test:
     errors.append("     -P cannot be used without -s\n")
 
 if args.port:
-    portStr = args.port.replace("file", "File").replace("http", "443").replace("smtp", "465").replace("imap", "993").replace("pop3", "995")
+    portStr = args.port.replace("http", "443").replace("smtp", "465").replace("imap", "993").replace("pop3", "995")
     srvcArr = portStr.split(",")
-    allowedPorts = ['File', '443', '465', '993', '995']
+    allowedPorts = ['apache', 'mail', '443', '465', '993', '995']
     die = []
     for srvc in srvcArr:
         if srvc not in allowedPorts:
@@ -366,7 +373,8 @@ if args.port:
 
     if len(die) != 0:
         errors.append("     accepted values are:")
-        errors.append("          file / File")
+        errors.append("          apache")
+        errors.append("          mail")
         errors.append("          http / 443")
         errors.append("          smtp / 465")
         errors.append("          imap / 993")
