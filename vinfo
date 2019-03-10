@@ -178,6 +178,8 @@ def getFile(hostIn, mode = 'display'):
     apacheArr = filter(certMatch.match, hostIn)
     if len(apacheArr) > 0:
         certFile = list(apacheArr)[-1].split(' ')[-1]
+        if mode == 'display':
+            print(frmStr % ('Apache Cert', certFile))
 
         priSerDom = getDoms(hostIn, domtype = 'pri', mode = 'return')
         secSerDom = getDoms(hostIn, domtype = 'sec', mode = 'return').split('\n')[0]
@@ -192,20 +194,19 @@ def getFile(hostIn, mode = 'display'):
         if len(priFound) == 0:
             secFound = filter(sniSecRegex.search, sniConf)
             if len(secFound) == 0:
-                print('--No Mail Cert Found--')
+                print(frmStr % ('Mail Cert', '  --Not Found--'))
+                print
             else:
                 startNum = [i for i, x in enumerate(sniConf) if x == secFound[0]][0]
+                if mode == 'display':
+                    print(frmStr % ('Mail Cert', sniConf[(startNum + 1)].split('<')[-1]))
+                    print
         else:
             startNum = [i for i, x in enumerate(sniConf) if x == priFound[0]][0]
-
-        certLine = startNum + 1
-        sniCert = sniConf[certLine].split('<')[-1]
-
-        if mode == 'display':
-            print(frmStr % ('Apache Cert', certFile))
-            print(frmStr % ('Mail Cert', sniCert))
-            print
-        elif mode == 'return':
+            if mode == 'display':
+                print(frmStr % ('Mail Cert', sniConf[(startNum + 1)].split('<')[-1]))
+                print
+        if mode == 'return':
             return certFile
     else:
         if mode == 'display':
