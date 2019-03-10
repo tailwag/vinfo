@@ -204,9 +204,9 @@ def getFile(hostIn, service = 'all', mode = 'display'):
 
             if service == 'mail' or service == 'all':
                 if 'mailCert' in locals():
-                    print(frmStr % ('Mail Cert', mailCert))
+                    print(frmStr % ('  Mail Cert', mailCert))
                 else:
-                    print(frmStr % ('Mail Cert', ' -- Not Found --'))
+                    print(frmStr % ('  Mail Cert', ' -- Not Found --'))
             print
 
         if mode == 'return':
@@ -308,7 +308,7 @@ def getCert(hostIn, ports = ['File', '443', '465', '993', '995']):
 
 parser = argparse.ArgumentParser(prefix_chars='-')
 parser = argparse.ArgumentParser(description="vinfo - Devin Shoemaker 2019 - a tool to gather information \nabout specific virtualhosts on cpanel servers")
-parser.add_argument("-a", "--address", help="retrieve ip address of site / all sites associated with docroot", action="store_true")
+parser.add_argument("-a", "--address", help="retrieve ip address of site / docroot's associated sites", action="store_true")
 parser.add_argument("-c", "--cert", help="retrieve the location of the SSL cert file used by apache", action="store_true")
 parser.add_argument("-S", help="used with -c to specify 'web' or 'mail' for certfile retrieval. defaults to both.", dest="srvc")
 parser.add_argument("-d", "--domain", help="retrieve list of domains for given docroot", action="store_true")
