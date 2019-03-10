@@ -60,7 +60,8 @@ def getHost (searchString, mode = 'starray'):
     elif filter(domSearch.match, vhost):
         found = list(filter(domSearch.match, vhost))[-1]
     else:
-        sys.exit("Error:\n     no vhost found for " + searchString + "\n")
+        print('\033[1;31mFatal Error:\033[0m')
+        sys.exit("     no vhost found for " + searchString + "\n")
     
     # get line number of returned line
     check = [i for i, x in enumerate(vhost) if x == found][-1]
@@ -173,14 +174,21 @@ def getDoms(hostIn, domtype = 'all', mode = 'display'):
             return "\n".join(allDom)
 
 def getFile(hostIn, service = 'all', mode = 'display'):
+    # find the ssl specification within vhost 
     certMatch = re.compile(r'\s*?SSLCertificateFile.*')
     apacheArr = filter(certMatch.match, hostIn)
+
+    # if ssl line found continue
     if len(apacheArr) > 0:
+        # actual cert file 
         certFile = list(apacheArr)[-1].split(' ')[-1]
 
+        # select ServerName ans first ServerAlias from vhost
+        # dovecot sni.conf always seems to use one or the other
         priSerDom = getDoms(hostIn, domtype = 'pri', mode = 'return')
         secSerDom = getDoms(hostIn, domtype = 'sec', mode = 'return').split('\n')[0]
 
+        # import all of dovecot sni conf into a list
         sniConfCom = 'sudo cat /etc/dovecot/sni.conf'
         sniConf = subprocess.Popen(sniConfCom, stdout=subprocess.PIPE, shell=True).communicate()[0].split('\n')
 
@@ -188,12 +196,17 @@ def getFile(hostIn, service = 'all', mode = 'display'):
         sniSecRegex = re.compile(r'local_name\s.*' + secSerDom)
 
         priFound = filter(sniPriRegex.search, sniConf)
+        # if ServerName -not- found in sni conf
         if len(priFound) == 0:
             secFound = filter(sniSecRegex.search, sniConf)
+            # if ServerAlias found
             if len(secFound) != 0:
+                # retrieve ssl_cert from sni conf (1 line after local_name
                 startNum = [i for i, x in enumerate(sniConf) if x == secFound[0]][0]
                 mailCert = sniConf[(startNum + 1)].split('<')[-1]
         else:
+            # if ServerName found
+            # retrieve ssl_cert from sni conf (1 line after local_name
             startNum = [i for i, x in enumerate(sniConf) if x == priFound[0]][0]
             mailCert = sniConf[(startNum + 1)].split('<')[-1]
 
@@ -214,7 +227,7 @@ def getFile(hostIn, service = 'all', mode = 'display'):
             elif service == 'mail':
                 if 'mailCert' in locals():
                     return mailCert
-            elif service == 'all' or service == 'both':
+            elif service == 'all':
                 if 'mailCert' in locals():
                     return certFile + ' ' + mailCert
                 else:
@@ -295,13 +308,13 @@ def getCert(hostIn, ports = ['apache', 'mail', '443', '465', '993', '995']):
                 # Invalid is default state, changed to valid if domain name is listed on the cert
                 #      --then--
                 # if current datetime is past datetime from cert, status set to Expired
-                isValid = 'Invalid'
+                isValid = '\033[1;33mInvalid\033[0m'
                 for val in dnsHostArr:
                     if val == snDom:
-                        isValid = '  Valid' 
+                        isValid = '  \033[1;32mValid\033[0m'
 
                 if curDate > certDate:
-                    isValid = 'Expired'
+                    isValid = '\033[1;31mExpired\033[0m'
                             
 	        sslExp.append(portStr + " : " + isValid + " -" + notAfter)
 	for portCheck in sslExp:
@@ -329,38 +342,51 @@ parser.add_argument('search', help="domain or docroot")
 
 args, unknown = parser.parse_known_args()
 
-errors = ["Error:"]
+##### start error handling #####
+errors = []
+
+# handle unknown arguments, which are stored in list(unknown) if present
 if unknown:
     if len(unknown) == 1:
         errors.append("     " + ', '.join(unknown) + " not a valid argument\n")
     else:
         errors.append("     " + ', '.join(unknown) + " are not valid arguments\n")
 
+# in case of `vinfo -S domain.com`
 if args.srvc and not args.cert:
     errors.append("     -S cannot be used without -c\n")
 
-if args.srvc and args.srvc not in ['web', 'mail']:
+# handle unknown options for -S
+if args.srvc and args.srvc not in ['web', 'mail', 'all']:
     errors.append("     '" + args.srvc + "' is not a valid option for -S")
     errors.append("     accepted options are:")
     errors.append("          web")
     errors.append("          mail\n")
 
+# in case of `vinfo -D domain.com`
 if args.type and not args.domain:
     errors.append("     -D cannot be used without -d\n")
 
+# handle unknown options for -D
 if args.type and args.type not in ['primary', 'pri', 'secondary', 'sec', 'all']:
     errors.append("     Supported options for -D are:")
     errors.append("            primary / pri")
     errors.append("          secondary / sec\n")
 
+# in case of `vinfo -P doamain.com`
 if args.port and not args.ssl_test:
     errors.append("     -P cannot be used without -s\n")
 
 if args.port:
+    # ensure proper values are provided for getCert()
     portStr = args.port.replace("http", "443").replace("smtp", "465").replace("imap", "993").replace("pop3", "995")
+
+    # convert to list for passage to getCert()
     srvcArr = portStr.split(",")
-    allowedPorts = ['apache', 'mail', '443', '465', '993', '995']
+    allowedPorts = ['apache', 'mail', '443', '465', '993', '995', 'all']
     die = []
+
+    # ensure no unknown values are provided
     for srvc in srvcArr:
         if srvc not in allowedPorts:
             die.append(srvc)
@@ -379,16 +405,26 @@ if args.port:
         errors.append("          imap / 993")
         errors.append("          pop3 / 995\n")
 
-if (len(errors) > 1):
+# if any errors detected, print them before exiting
+if errors:
+    print("\033[1;31mFatal Error:\033[0m")
     sys.exit("\n".join(errors))
 
+#####   end error handling #####
+
+
+# domain / docroot 
 search = args.search
 
+# handle --clean
 if args.clean:
     output = 'return'
 else:
     output = 'display'
 
+# `vinfo -g (domain or docroot)`
+# negates all other options except --clean 
+# formatted includes line numbers from httpd.conf 
 if args.get_host:
     if args.clean:
         print getHost(search, output)
@@ -398,24 +434,36 @@ if args.get_host:
 else:
     virtualHost = getHost(search)
 
+# `vinfo -a (domain|docroot)`
+# retrieves ip address from vhost
+# affected by --clean
 if args.address:
     if args.clean:
         print getAddr(virtualHost, output)
     else:
         getAddr(virtualHost)
 
+# `vinfo -u (domain|docroot)`
+# retrieves user owning the docroot from vhost, not filepath 
+# affected by --clean 
 if args.user:
     if args.clean:
         print getUser(virtualHost, output)
     else:
         getUser(virtualHost)
 
+# `vinfo -r [domain or docroot]`
+# retrieves docroot from vhost
+# affected by --clean
 if args.root:
     if args.clean:
         print getRoot(virtualHost, output)
     else:
         getRoot(virtualHost)
 
+# `vinfo -d [-D (pri|sec)] (domain|docroot)`
+# retrieves servername and serveralias domains, defaults to both
+# affected by --clean
 if args.domain:
     if args.clean:
         if args.type:
@@ -428,6 +476,9 @@ if args.domain:
         else:
             getDoms(virtualHost)
 
+# `vinfo -c [-S (web|mail)] (domain|docroot)`
+# retrieves location of certs used to secure either mail or apache, defaults to both 
+# affected by --clean 
 if args.cert:
     if args.clean:
         if args.srvc:
@@ -440,12 +491,27 @@ if args.cert:
         else:
             getFile(virtualHost)
 
+# `vinfo -s [-P apache,mail,http,smtp,imap,pop3] (domain|docroot)`
+# tests all ssl certs, returns (valid|invalid|expired) - [expiration date] for each (file|service) tested
+# defaults to test all. specified domain used for test if vinfo was run with domain. 
+# if docroot was used, primary domain from vhost will be used 
+#       valid - returned if cert is not expired -and- domain used for test was 
+#               listed either as a common name or subject alternative name 
+#     invalid - returned if cert id not expired, but domain was not listed on cert
+#     expired - self explanatory 
 if args.ssl_test:
     if args.port:
-        getCert(virtualHost, srvcArr)
+        if args.port == 'all':
+            getCert(virtualHost)
+        else:
+            getCert(virtualHost, srvcArr)
     else:
         getCert(virtualHost)
         
+# if no options specified, run default 
+# equivalent of:
+#       `vinfo -aurdcs -D all -P all -S all (domain|docroot)`
+# not affected by --clean
 default = True
 for check in args.__dict__:
     if check != 'search' and check != 'clean' and args.__dict__[check]:
