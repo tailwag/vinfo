@@ -449,7 +449,7 @@ if args.ssl_test:
         
 default = True
 for check in args.__dict__:
-    if check != 'search' and args.__dict__[check]:
+    if check != 'search' and check != 'clean' and args.__dict__[check]:
         default = False
 
 if default:
