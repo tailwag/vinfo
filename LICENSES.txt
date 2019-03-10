@@ -1,0 +1,8 @@
+vinfo was written by Devin Shoemaker and is distributed under the GPL2
+licenses/gplv2.txt
+https://github.com/tailwag/vinfo.git
+
+argparse.py include directly, as this module isn't built into python 2.6
+argparse is licensed under the pyhton software foundation liscense
+licenses/psfl.txt
+https://github.com/ThomasWaldmann/argparse.git
