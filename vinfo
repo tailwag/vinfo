@@ -175,10 +175,35 @@ def getDoms(hostIn, domtype = 'all', mode = 'display'):
 
 def getFile(hostIn, mode = 'display'):
     certMatch = re.compile(r'\s*?SSLCertificateFile.*')
-    if len(filter(certMatch.match, hostIn)) > 0:
-        certFile = list(filter(certMatch.match, hostIn))[-1].split(' ')[-1]
+    apacheArr = filter(certMatch.match, hostIn)
+    if len(apacheArr) > 0:
+        certFile = list(apacheArr)[-1].split(' ')[-1]
+
+        priSerDom = getDoms(hostIn, domtype = 'pri', mode = 'return')
+        secSerDom = getDoms(hostIn, domtype = 'sec', mode = 'return').split('\n')[0]
+
+        sniConfCom = 'sudo cat /etc/dovecot/sni.conf'
+        sniConf = subprocess.Popen(sniConfCom, stdout=subprocess.PIPE, shell=True).communicate()[0].split('\n')
+
+        sniPriRegex = re.compile(r'local_name\s.*' + priSerDom)
+        sniSecRegex = re.compile(r'local_name\s.*' + secSerDom)
+
+        priFound = filter(sniPriRegex.search, sniConf)
+        if len(priFound) == 0:
+            secFound = filter(sniSecRegex.search, sniConf)
+            if len(secFound) == 0:
+                print('--No Mail Cert Found--')
+            else:
+                startNum = [i for i, x in enumerate(sniConf) if x == secFound[0]][0]
+        else:
+            startNum = [i for i, x in enumerate(sniConf) if x == priFound[0]][0]
+
+        certLine = startNum + 1
+        sniCert = sniConf[certLine].split('<')[-1]
+
         if mode == 'display':
-            print(frmStr % ('Certificate', certFile))
+            print(frmStr % ('Apache Cert', certFile))
+            print(frmStr % ('Mail Cert', sniCert))
             print
         elif mode == 'return':
             return certFile
