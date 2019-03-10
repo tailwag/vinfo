@@ -1,9 +1,8 @@
 #!/usr/bin/python
 
 # vInfo - Devin Shoemaker 2019-03-03
-# retrieves information about specific vhosts on cPanel servers
+#             Beta v0.2.1 2019-03-10
 # https://github.com/tailwag/vinfo
-#
 # `vinfo -h` for usage
 
 import os 
