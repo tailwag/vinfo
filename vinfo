@@ -1,9 +1,8 @@
 #!/usr/bin/python
 
 # vInfo - Devin Shoemaker 2019-03-03
-# retrieves information about specific vhosts on cPanel servers
+#             Beta v0.2.1 2019-03-10
 # https://github.com/tailwag/vinfo
-#
 # `vinfo -h` for usage
 
 import os 
@@ -102,7 +101,7 @@ def getHost (searchString, mode = 'starray'):
     if mode == 'display':
         lineNo = vbegin
         for line in foundHost:
-            print(str(lineNo) + " | " + line)
+            print('\033[1;37m' + str(lineNo) + '\033[0m' + " \033[1;31m|\033[0m " + line)
             lineNo += 1
     elif mode == 'return':
         return "\n".join(foundHost)
@@ -173,30 +172,69 @@ def getDoms(hostIn, domtype = 'all', mode = 'display'):
         elif domtype == 'all':
             return "\n".join(allDom)
 
-def getFile(hostIn, mode = 'display'):
+def getFile(hostIn, service = 'all', mode = 'display'):
     certMatch = re.compile(r'\s*?SSLCertificateFile.*')
-    if len(filter(certMatch.match, hostIn)) > 0:
-        certFile = list(filter(certMatch.match, hostIn))[-1].split(' ')[-1]
+    apacheArr = filter(certMatch.match, hostIn)
+    if len(apacheArr) > 0:
+        certFile = list(apacheArr)[-1].split(' ')[-1]
+
+        priSerDom = getDoms(hostIn, domtype = 'pri', mode = 'return')
+        secSerDom = getDoms(hostIn, domtype = 'sec', mode = 'return').split('\n')[0]
+
+        sniConfCom = 'sudo cat /etc/dovecot/sni.conf'
+        sniConf = subprocess.Popen(sniConfCom, stdout=subprocess.PIPE, shell=True).communicate()[0].split('\n')
+
+        sniPriRegex = re.compile(r'local_name\s.*' + priSerDom)
+        sniSecRegex = re.compile(r'local_name\s.*' + secSerDom)
+
+        priFound = filter(sniPriRegex.search, sniConf)
+        if len(priFound) == 0:
+            secFound = filter(sniSecRegex.search, sniConf)
+            if len(secFound) != 0:
+                startNum = [i for i, x in enumerate(sniConf) if x == secFound[0]][0]
+                mailCert = sniConf[(startNum + 1)].split('<')[-1]
+        else:
+            startNum = [i for i, x in enumerate(sniConf) if x == priFound[0]][0]
+            mailCert = sniConf[(startNum + 1)].split('<')[-1]
+
         if mode == 'display':
-            print(frmStr % ('Certificate', certFile))
+            if service == 'web' or service == 'all':
+                print(frmStr % ('Apache Cert', certFile))
+
+            if service == 'mail' or service == 'all':
+                if 'mailCert' in locals():
+                    print(frmStr % ('  Mail Cert', mailCert))
+                else:
+                    print(frmStr % ('  Mail Cert', ' -- Not Found --'))
             print
-        elif mode == 'return':
-            return certFile
+
+        if mode == 'return':
+            if service == 'web':
+                return certFile
+            elif service == 'mail':
+                if 'mailCert' in locals():
+                    return mailCert
+            elif service == 'all' or service == 'both':
+                if 'mailCert' in locals():
+                    return certFile + ' ' + mailCert
+                else:
+                    return certFile
     else:
         if mode == 'display':
             sslWarn = True
             print("--SSL Not Enabled--")
             print
 
-def getCert(hostIn, ports = ['File', '443', '465', '993', '995']):
+def getCert(hostIn, ports = ['apache', 'mail', '443', '465', '993', '995']):
     certMatch = re.compile(r'\s*?SSLCertificateFile.*')
     if len(filter(certMatch.match, hostIn)) > 0:
-        certFile = list(filter(certMatch.match, hostIn))[-1].split(' ')[-1]
+        httpCert = getFile(hostIn, 'web', 'return')
+        mailCert = getFile(hostIn, 'mail', 'return')
 
         # uses previously defined ip function to return site's IP 
         # used in openssl "connect" statement
         ipAddy = getAddr(hostIn, 'return')
-        sslFrm = "%-6s  %5s"
+        sslFrm = "%-4s  %5s"
 
         # selects domain for openssl tests
         # if docroot is used, grabs domain from cert file path 
@@ -211,55 +249,61 @@ def getCert(hostIn, ports = ['File', '443', '465', '993', '995']):
 	sslExp = list()
 	for port in ports: 
             # grabs entirety of openssl x509 output for each port
-            if port == 'File':
-		portStr = port
-                xRun = 'sudo cat ' + certFile + ' | openssl x509 -text | sed "s:^[ \\t]*::"'
+            if port == 'apache':
+		portStr = port.capitalize()
+                xRun = 'sudo cat ' + httpCert + ' | openssl x509 -text | sed "s:^[ \\t]*::"'
+            elif port == 'mail':
+                if mailCert:
+		    portStr = '  ' + port.capitalize()
+                    xRun = 'sudo cat ' + mailCert + ' | openssl x509 -text | sed "s:^[ \\t]*::"'
+                else:
+                    portStr = False
             else:
-		portStr = str(port) + ' ' 
+		portStr = str(port) + ' '
                 xRun = 'openssl s_client -showcerts -servername ' + snDom + ' -connect ' + ipAddy + ':' + portStr + ' < /dev/null 2>&1 | openssl x509 -text | sed "s:^[ \\t]*::"'
+                portStr = '   ' + str(port)
+            if portStr:
+                xArray = subprocess.Popen(xRun, stdout=subprocess.PIPE, shell=True).communicate()[0].split('\n')
+                comRegex = re.compile(r'Subject\s?:?.*CN\s?=\s?[a-z0-9\.\-]+')
+                naRegex  = re.compile(r'Not After.*')
+                dnsRegex = re.compile(r'DNS:.*')
 
-            xArray = subprocess.Popen(xRun, stdout=subprocess.PIPE, shell=True).communicate()[0].split('\n')
+                # retrieves "Not After" (expiration) from openssl x509 
+                notAfter = ':'.join(list(filter(naRegex.match, xArray))[-1].split(':')[1:])
+                dateArr  = notAfter.split(' ')
 
-            comRegex = re.compile(r'Subject\s?:?.*CN\s?=\s?[a-z0-9\.\-]+')
-            naRegex  = re.compile(r'Not After.*')
-            dnsRegex = re.compile(r'DNS:.*')
+                # concatenate date from openssl while converting 3 letter date code to 2 digit int
+                # certdate = YearMonthDayHourMinuteSecond (YYYYmmddHHMMSS) in GMT (openssl default)
+                if dateArr[2] == '':
+                    certDate = dateArr[5] + str(addNulls(getMonth(dateArr[1]))) + str(addNulls(dateArr[3])) + dateArr[4].replace(":", "")
+                else:
+                    certDate = dateArr[4] + str(addNulls(getMonth(dateArr[1]))) + str(dateArr[2]) + dateArr[4].replace(":", "")
 
-            # retrieves "Not After" (expiration) from openssl x509 
-            notAfter = ':'.join(list(filter(naRegex.match, xArray))[-1].split(':')[1:])
-            dateArr  = notAfter.split(' ')
+                # retrieves current datetime from system in GMT
+                # system used for portability, as pytz is not usually installed by default
+                dateCom = 'TZ=GMT date "+%Y%m%d%H%M%S"'
+                curDate = subprocess.Popen(dateCom, stdout=subprocess.PIPE, shell=True).communicate()[0]
 
-            # concatenate date from openssl while converting 3 letter date code to 2 digit int
-            # certdate = YearMonthDayHourMinuteSecond (YYYYmmddHHMMSS) in GMT (openssl default)
-            if dateArr[2] == '':
-                certDate = dateArr[5] + str(addNulls(getMonth(dateArr[1]))) + str(addNulls(dateArr[3])) + dateArr[4].replace(":", "")
-            else:
-                certDate = dateArr[4] + str(addNulls(getMonth(dateArr[1]))) + str(dateArr[2]) + dateArr[4].replace(":", "")
+                dnsHostArr = []
+                # creates list of all SANs from openssl x509 
+	        # if no SANs found, CN is used
+                if len(filter(dnsRegex.match, xArray)) == 0:
+	            dnsHostArr.append(re.search(comRegex, filter(comRegex.match, xArray)[-1]).group(0).split("=")[-1])
+	        else:
+                    dnsHostArr = list(filter(dnsRegex.match, xArray))[-1].replace("DNS:", "").replace(",", "").split(' ')
+	            
+                # Invalid is default state, changed to valid if domain name is listed on the cert
+                #      --then--
+                # if current datetime is past datetime from cert, status set to Expired
+                isValid = 'Invalid'
+                for val in dnsHostArr:
+                    if val == snDom:
+                        isValid = '  Valid' 
 
-            # retrieves current datetime from system in GMT
-            # system used for portability, as pytz is not usually installed by default
-            dateCom = 'TZ=GMT date "+%Y%m%d%H%M%S"'
-            curDate = subprocess.Popen(dateCom, stdout=subprocess.PIPE, shell=True).communicate()[0]
-
-            dnsHostArr = []
-            # creates list of all SANs from openssl x509 
-	    # if no SANs found, CN is used
-            if len(filter(dnsRegex.match, xArray)) == 0:
-		dnsHostArr.append(re.search(comRegex, filter(comRegex.match, xArray)[-1]).group(0).split("=")[-1])
-	    else:
-            	dnsHostArr = list(filter(dnsRegex.match, xArray))[-1].replace("DNS:", "").replace(",", "").split(' ')
-		
-            # Invalid is default state, changed to valid if domain name is listed on the cert
-            #      --then--
-            # if current datetime is past datetime from cert, status set to Expired
-            isValid = 'Invalid'
-            for val in dnsHostArr:
-                if val == snDom:
-                    isValid = '  Valid' 
-
-            if curDate > certDate:
-                isValid = 'Expired'
-                        
-	    sslExp.append(portStr + " : " + isValid + " -" + notAfter)
+                if curDate > certDate:
+                    isValid = 'Expired'
+                            
+	        sslExp.append(portStr + " : " + isValid + " -" + notAfter)
 	for portCheck in sslExp:
 	    print(sslFrm % ('', portCheck))
         print
@@ -270,14 +314,15 @@ def getCert(hostIn, ports = ['File', '443', '465', '993', '995']):
 
 parser = argparse.ArgumentParser(prefix_chars='-')
 parser = argparse.ArgumentParser(description="vinfo - Devin Shoemaker 2019 - a tool to gather information \nabout specific virtualhosts on cpanel servers")
-parser.add_argument("-a", "--address", help="retrieve ip address of site / all sites associated with docroot", action="store_true")
+parser.add_argument("-a", "--address", help="retrieve ip address of site / docroot's associated sites", action="store_true")
 parser.add_argument("-c", "--cert", help="retrieve the location of the SSL cert file used by apache", action="store_true")
+parser.add_argument("-S", help="used with -c to specify 'web' or 'mail' for certfile retrieval. defaults to both.", dest="srvc")
 parser.add_argument("-d", "--domain", help="retrieve list of domains for given docroot", action="store_true")
 parser.add_argument("-D", help="used with -d to specify which domains select between servername or serveralias. options: primary, secondary", dest="type")
 parser.add_argument("-g", "--get-host", help="retrieves entire vhost. negates all other options with the exception of --clean", action="store_true")
 parser.add_argument("-r", "--root", help="retrieve the docroot for a given domain", action="store_true")
 parser.add_argument("-s", "--ssl-test", help="retrieve SSL information for a given domain / docroot", action="store_true")
-parser.add_argument("-P", help="used with -s to specify service(s) to run checks. supports comma separated input. options: file,http,smtp,imap,pop3 or file,443,465,993,995", dest="port")
+parser.add_argument("-P", help="used with -s to specify service(s) to run checks. supports comma separated input.", dest="port")
 parser.add_argument("-u", "--user", help="retrieve the user which owns the site / docroot", action="store_true")
 parser.add_argument("--clean", help="return clean output (no formatting)", action="store_true")
 parser.add_argument('search', help="domain or docroot")
@@ -291,21 +336,30 @@ if unknown:
     else:
         errors.append("     " + ', '.join(unknown) + " are not valid arguments\n")
 
-if args.port and not args.ssl_test:
-    errors.append("     -P cannot be used without -s\n")
+if args.srvc and not args.cert:
+    errors.append("     -S cannot be used without -c\n")
+
+if args.srvc and args.srvc not in ['web', 'mail']:
+    errors.append("     '" + args.srvc + "' is not a valid option for -S")
+    errors.append("     accepted options are:")
+    errors.append("          web")
+    errors.append("          mail\n")
 
 if args.type and not args.domain:
     errors.append("     -D cannot be used without -d\n")
 
 if args.type and args.type not in ['primary', 'pri', 'secondary', 'sec', 'all']:
     errors.append("     Supported options for -D are:")
-    errors.append("         primary (pri)")
-    errors.append("         secondary (sec))\n")
+    errors.append("            primary / pri")
+    errors.append("          secondary / sec\n")
+
+if args.port and not args.ssl_test:
+    errors.append("     -P cannot be used without -s\n")
 
 if args.port:
-    portStr = args.port.replace("file", "File").replace("http", "443").replace("smtp", "465").replace("imap", "993").replace("pop3", "995")
+    portStr = args.port.replace("http", "443").replace("smtp", "465").replace("imap", "993").replace("pop3", "995")
     srvcArr = portStr.split(",")
-    allowedPorts = ['File', '443', '465', '993', '995']
+    allowedPorts = ['apache', 'mail', '443', '465', '993', '995']
     die = []
     for srvc in srvcArr:
         if srvc not in allowedPorts:
@@ -315,6 +369,15 @@ if args.port:
         errors.append("     '" + die[0] + "' is not a valid port or service\n")
     elif (len(die) >= 1):
         errors.append("     '" + ', '.join(die) + "' are not valid ports or services\n")
+
+    if len(die) != 0:
+        errors.append("     accepted values are:")
+        errors.append("          apache")
+        errors.append("          mail")
+        errors.append("          http / 443")
+        errors.append("          smtp / 465")
+        errors.append("          imap / 993")
+        errors.append("          pop3 / 995\n")
 
 if (len(errors) > 1):
     sys.exit("\n".join(errors))
@@ -367,9 +430,15 @@ if args.domain:
 
 if args.cert:
     if args.clean:
-        print getFile(virtualHost, output)
+        if args.srvc:
+            print getFile(virtualHost, args.srvc, output)
+        else:
+            print getFile(virtualHost, 'all', output)
     else:
-        getFile(virtualHost)
+        if args.srvc:
+            getFile(virtualHost, args.srvc, output)
+        else:
+            getFile(virtualHost)
 
 if args.ssl_test:
     if args.port:
@@ -379,7 +448,7 @@ if args.ssl_test:
         
 default = True
 for check in args.__dict__:
-    if check != 'search' and args.__dict__[check]:
+    if check != 'search' and check != 'clean' and args.__dict__[check]:
         default = False
 
 if default:
