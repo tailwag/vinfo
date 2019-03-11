@@ -192,8 +192,8 @@ def getFile(hostIn, service = 'all', mode = 'display'):
         sniConfCom = 'sudo cat /etc/dovecot/sni.conf'
         sniConf = subprocess.Popen(sniConfCom, stdout=subprocess.PIPE, shell=True).communicate()[0].split('\n')
 
-        sniPriRegex = re.compile(r'local_name\s.*' + priSerDom)
-        sniSecRegex = re.compile(r'local_name\s.*' + secSerDom)
+        sniPriRegex = re.compile(r'local_name\s.*("|\s)' + priSerDom + '("|\s)')
+        sniSecRegex = re.compile(r'local_name\s.*("|\s)' + secSerDom + '("|\s)')
 
         priFound = filter(sniPriRegex.search, sniConf)
         # if ServerName -not- found in sni conf
