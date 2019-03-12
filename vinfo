@@ -69,7 +69,8 @@ def getHost (searchString, mode = 'starray', user = False):
     elif filter(usrSearch.match, vhost):
         found = list(filter(usrSearch.match, vhost))
         if len(found) > 1:
-            menu = True
+           global menu 
+           menu = True
     else:
         print('\033[1;31mFatal Error:\033[0m')
         sys.exit("     no vhost found for " + searchString + "\n")
@@ -294,7 +295,7 @@ def getCert(hostIn, ports = ['apache', 'mail', '443', '465', '993', '995']):
         # selects domain for openssl tests
         # if docroot is used, grabs domain from cert file path 
         # specified domain used if domain used 
-        if os.path.isdir(search):
+        if os.path.isdir(search) or isset('menu'):
             snDom = getDoms(virtualHost, 'pri', 'return')
         else:
             snDom = search
