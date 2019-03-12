@@ -38,8 +38,7 @@ def addNulls (intIn):
     else:
         return intIn
 	
-def getHost (searchString, mode = 'starray', user = False):
-    
+def getHost (searchString, mode = 'starray'): 
     # retrieve whole httpd.conf
     if os.path.isdir('/etc/apache2/conf'):
         getConf = 'sudo cat /etc/apache2/conf/httpd.conf'
@@ -50,11 +49,13 @@ def getHost (searchString, mode = 'starray', user = False):
     
     # convert httpd.conf into list by line
     vhost = conf.split('\n')
-    
+   
+    # define all domain specific regexes for locating vhost
     docSearch = re.compile(r'\s*?DocumentRoot\s' + searchString)
     domSearch = re.compile(r'\s*?Server(Name|Alias).*?\s' + searchString + '.*?')
     usrSearch = re.compile(r'\s*?AssignUserID\s' + searchString + '\s' + searchString)
     
+    # defing all non specific regexes for determining line position
     ovhMatch = re.compile(r'<VirtualHost [1-2]?[0-9]{1,2}(\.[1-2]?[0-9]{1,2}){3}:(80|443)>')
     cvhMatch = re.compile(r'</VirtualHost>')
     docMatch = re.compile(r'\s*?DocumentRoot\s.*')
@@ -62,92 +63,153 @@ def getHost (searchString, mode = 'starray', user = False):
 
     
     # return line searched for 
+    # if document root supplied as search string 
     if filter(docSearch.match, vhost):
         found = list(filter(docSearch.match, vhost))
+
+    # if domain supplied as search string
     elif filter(domSearch.match, vhost):
         found = list(filter(domSearch.match, vhost))
+
+    # if user supplied as search string
     elif filter(usrSearch.match, vhost):
         found = list(filter(usrSearch.match, vhost))
+        # if user is used and more than one vhost found, spawn selection menu
         if len(found) > 1:
            global menu 
            menu = True
+
+    # if no vhost found, return error
     else:
         print('\033[1;31mFatal Error:\033[0m')
         sys.exit("     no vhost found for " + searchString + "\n")
     
+    #continue if 1 or more vhosts were found matching search string
     if len(found) != 0:
+        # foundHost to be used later. list of selected host split by \n
         foundHost = []
-        hostList = []
+
+        # hostList to be used later. menu of which hosts to select if user used.
+        hostList  = []
+
+        # determine line(s) on which searchstring was found
         foundOn = [i for i, x in enumerate(vhost) if x == found[-1]]
 
+        # determines the print formatting of the menu
+        # updated later depending on how log the ips and domains are 
         lenPri = 1
         lenIpa = 1
+
+        # locates the neccesary information from the vhosts in which the search string was found
         for line in foundOn:
+            # empty beginning and end at start of each pass
             beg = False
             end = False
+
+            # decriment one line until beginning found
             while not beg:
+                # if <VirtualHost x.x.x.x:xx> tag found 
                 if ovhMatch.match(vhost[line]):
+                    # strips raw tag down to x.x.x.x:xx, then splits into list ['x.x.x.x', 'xx']
                     preForm = vhost[line].split(' ')[-1].replace(">", "").split(":")
+
+                    # vAddr = 'x.x.x.x', vPort = 'xx'
                     vAddr, vPort = preForm
-                    beg = str(line)
+
+                    # define length of logest IP address in menu for formatting
                     if len(vAddr) > lenIpa:
                         lenIpa = len(vAddr)
 
+                    # determine starting line number of vhost
+                    beg = str(line)
+
                 else:
                     line -= 1
-
+            # increment one line until end found 
             while not end:
+                # if </VirtualHost> found 
                 if cvhMatch.match(vhost[line]):
+                    # determine ending line number
                     end = str(line)
-                else:
-                    if docMatch.match(vhost[line]):
-                        docRoot = vhost[line].split(' ')[-1]
 
+                else:
+                    # if DocumentRoot found
+                    if docMatch.match(vhost[line]):
+                        # set docroot for menu
+                        docRoot = vhost[line].split(' ')[-1]
+                    
+                    # if ServerName found
                     elif namMatch.match(vhost[line]):
+                        # set domain for menu
                         priDom = vhost[line].split(' ')[-1]
+
+                        # define length of longest domain in menu for formatting
                         if len(priDom) > lenPri:
                             lenPri = len(priDom)
-
                     line += 1
+
+            # add each vhost's information to list used to generate menu
             hostList.append([beg, end, vAddr, vPort, priDom, docRoot])
 
+        # define menu's formatting using the values generated above 
         frmPause = '%-3s- %-' + str(lenPri + 3) + 's- %-' + str(lenIpa + 1) + 's- %-4s- %-2s'
 
-        if len(hostList) <= 2 and not 'menu' in locals():
+        # dont display menu if 2 or less results displayed when docroot/domain searched for
+        if len(hostList) <= 2 and not isset('menu'):
             hostSelection = len(hostList)
+
+        # display menu to prompt for vhost selection if user searched for 
+        # if improper input provided, it loops and displays again 
         while not 'hostSelection' in locals():
             hostId = 1
             hostDesc = ''
             print
+
+            # separates each individual host's attributes from list of all hosts
             for host in hostList:
-                secBool = ''
+                # display description of each host, see `hostList.append()`
                 print(frmPause % (hostId, '"' + host[4] + '"', host[2], host[3], host[5]))
                 hostId += 1
-
+            
+            # try used so if non integer is provided, no error is shown, it just loops
             try:
                 print
                 selHost = int(raw_input(" [vhost to use]: "))
                 print
+
+                # if value is an integer and is a valid selection, complete loop
                 if selHost <= len(hostList) and selHost > 0:
                     hostSelection = selHost
             except:
                 print
-
+        
+        # determine starting and ending lines for selected vhost 
         startLine  = int(hostList[hostSelection - 1][0])
         finishLine = int(hostList[hostSelection - 1][1])
+
+        # create list of only selected vhost
         foundHost.extend(vhost[startLine:finishLine + 1])
 
     if mode == 'display':
+        # set start line, +1 to match actual line number on system
         lineNo = startLine + 1
+
+        # print each line of selected vhost with line number from httpd.conf
         for line in foundHost:
             print('\033[1;37m' + str(lineNo) + '\033[0m' + " \033[1;31m|\033[0m " + line)
             lineNo += 1
+
     elif mode == 'return':
+        # return only lines from vhost
         return "\n".join(foundHost)
+
     elif mode == 'array':
+        # return only lines from vhost in list form
         return foundHost
+
     elif mode == 'starray':
         stArray = []
+        # return only lined from vhost with leading whitespace stripped 
         for spLine in foundHost:
             stArray.append(spLine.lstrip())
         return stArray
