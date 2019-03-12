@@ -131,12 +131,13 @@ def getHost (searchString, mode = 'starray', user = False):
                     hostSelection = selHost
             except:
                 print
-        
-        foundHost.extend(vhost[int(hostList[hostSelection - 1][0]):int(hostList[hostSelection -1][1]) + 1])
 
+        startLine  = int(hostList[hostSelection - 1][0])
+        finishLine = int(hostList[hostSelection - 1][1])
+        foundHost.extend(vhost[startLine:finishLine + 1])
 
     if mode == 'display':
-        lineNo = vbegin
+        lineNo = startLine + 1
         for line in foundHost:
             print('\033[1;37m' + str(lineNo) + '\033[0m' + " \033[1;31m|\033[0m " + line)
             lineNo += 1
