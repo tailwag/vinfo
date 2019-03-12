@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
-# vInfo - Devin Shoemaker 2019-03-03
-#             Beta v0.2.1 2019-03-10
+# vInfo - Devin Shoemaker     2019-03-03
+#             Beta v0.2.4 rc1 2019-03-10
 # https://github.com/tailwag/vinfo
 # `vinfo -h` for usage
 
@@ -38,7 +38,7 @@ def addNulls (intIn):
     else:
         return intIn
 	
-def getHost (searchString, mode = 'starray'):
+def getHost (searchString, mode = 'starray', user = False):
     
     # retrieve whole httpd.conf
     if os.path.isdir('/etc/apache2/conf'):
@@ -53,52 +53,86 @@ def getHost (searchString, mode = 'starray'):
     
     docSearch = re.compile(r'\s*?DocumentRoot\s' + searchString)
     domSearch = re.compile(r'\s*?Server(Name|Alias).*?\s' + searchString + '.*?')
+    usrSearch = re.compile(r'\s*?AssignUserID\s' + searchString + '\s' + searchString)
+    
+    ovhMatch = re.compile(r'<VirtualHost [1-2]?[0-9]{1,2}(\.[1-2]?[0-9]{1,2}){3}:(80|443)>')
+    cvhMatch = re.compile(r'</VirtualHost>')
+    docMatch = re.compile(r'\s*?DocumentRoot\s.*')
+    priMatch = re.compile(r'\s*?ServerName\s.*')
+
     
     # return line searched for 
     if filter(docSearch.match, vhost):
-        found = list(filter(docSearch.match, vhost))[-1]
+        found = list(filter(docSearch.match, vhost))
     elif filter(domSearch.match, vhost):
-        found = list(filter(domSearch.match, vhost))[-1]
+        found = list(filter(domSearch.match, vhost))
+    elif filter(usrSearch.match, vhost):
+        found = list(filter(usrSearch.match, vhost))
     else:
         print('\033[1;31mFatal Error:\033[0m')
         sys.exit("     no vhost found for " + searchString + "\n")
     
-    # get line number of returned line
-    check = [i for i, x in enumerate(vhost) if x == found][-1]
-    
-    vbegin = check
-    vend = check
-    
-    # match opening and closing vhost tag 
-    vline = re.compile(r'</?VirtualHost.*?>')
-    
-    # determine beginning of desired vhost
-    while vbegin <= check:
-        grep = vline.search(vhost[vbegin])
-        if grep != None:
-            break
-        vbegin -= 1
-    
-    # determine end of desired vhost
-    while vend >= check:
-        grep = vline.search(vhost[vend])
-        if grep != None:
-            break
-        vend += 1
-    
-    prog = vbegin
-    
-    # add each line of desired vhost to a list
-    foundHost = []
-    if mode == 'starray':
-        while prog <= vend:
-            foundHost.append(vhost[prog].lstrip())
-            prog += 1
-    else: 
-        while prog <= vend:
-            foundHost.append(vhost[prog])
-            prog += 1
-    
+    if len(found) != 0:
+        foundHost = []
+        hostList = []
+        foundOn = [i for i, x in enumerate(vhost) if x == found[-1]]
+
+        lenPri = 1
+        lenIpa = 1
+        for line in foundOn:
+            beg = False
+            end = False
+            while not beg:
+                if ovhMatch.match(vhost[line]):
+                    preForm = vhost[line].split(' ')[-1].replace(">", "").split(":")
+                    vAddr, vPort = preForm
+                    beg = str(line)
+                    if len(vAddr) > lenIpa:
+                        lenIpa = len(vAddr)
+
+                else:
+                    line -= 1
+
+            while not end:
+                if cvhMatch.match(vhost[line]):
+                    end = str(line)
+                else:
+                    if docMatch.match(vhost[line]):
+                        docRoot = vhost[line].split(' ')[-1]
+
+                    elif priMatch.match(vhost[line]):
+                        priDom = vhost[line].split(' ')[-1]
+                        if len(priDom) > lenPri:
+                            lenPri = len(priDom)
+
+                    line += 1
+            hostList.append([beg, end, vAddr, vPort, priDom, docRoot])
+
+        frmPause = '%-3s- %-' + str(lenPri + 3) + 's- %-' + str(lenIpa + 1) + 's- %-4s- %-2s'
+
+        if len(hostList) <= 2:
+            hostSelection = len(hostList)
+        while not 'hostSelection' in locals():
+            hostId = 1
+            hostDesc = ''
+            print
+            for host in hostList:
+                secBool = ''
+                print(frmPause % (hostId, '"' + host[4] + '"', host[2], host[3], host[5]))
+                hostId += 1
+
+            try:
+                print
+                selHost = int(raw_input(" [vhost to use]: "))
+                print
+                if selHost <= len(hostList) and selHost > 0:
+                    hostSelection = selHost
+            except:
+                print
+        
+        foundHost.extend(vhost[int(hostList[hostSelection - 1][0]):int(hostList[hostSelection -1][1]) + 1])
+
+
     if mode == 'display':
         lineNo = vbegin
         for line in foundHost:
