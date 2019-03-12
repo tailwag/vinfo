@@ -68,6 +68,8 @@ def getHost (searchString, mode = 'starray', user = False):
         found = list(filter(domSearch.match, vhost))
     elif filter(usrSearch.match, vhost):
         found = list(filter(usrSearch.match, vhost))
+        if len(found) > 1:
+            menu = True
     else:
         print('\033[1;31mFatal Error:\033[0m')
         sys.exit("     no vhost found for " + searchString + "\n")
@@ -110,7 +112,7 @@ def getHost (searchString, mode = 'starray', user = False):
 
         frmPause = '%-3s- %-' + str(lenPri + 3) + 's- %-' + str(lenIpa + 1) + 's- %-4s- %-2s'
 
-        if len(hostList) <= 2:
+        if len(hostList) <= 2 and not menu in locals():
             hostSelection = len(hostList)
         while not 'hostSelection' in locals():
             hostId = 1
@@ -372,7 +374,7 @@ parser.add_argument("-s", "--ssl-test", help="retrieve SSL information for a giv
 parser.add_argument("-P", help="used with -s to specify service(s) to run checks. supports comma separated input.", dest="port")
 parser.add_argument("-u", "--user", help="retrieve the user which owns the site / docroot", action="store_true")
 parser.add_argument("--clean", help="return clean output (no formatting)", action="store_true")
-parser.add_argument('search', help="domain or docroot")
+parser.add_argument('search', help="domain, docroot, or user")
 
 args, unknown = parser.parse_known_args()
 
