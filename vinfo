@@ -52,7 +52,7 @@ def getHost (searchString, mode = 'starray'):
    
     # define all domain specific regexes for locating vhost
     docSearch = re.compile(r'\s*?DocumentRoot\s' + searchString)
-    domSearch = re.compile(r'\s*?Server(Name|Alias).*?\s' + searchString + '(\s.*|\b)')
+    domSearch = re.compile(r'\s*?Server(Name|Alias).*?\s' + searchString + '(\s.*|$)')
     usrSearch = re.compile(r'\s*?AssignUserID\s' + searchString + '\s' + searchString)
     
     # define all non specific regexes for determining line position
