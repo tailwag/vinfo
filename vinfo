@@ -52,10 +52,10 @@ def getHost (searchString, mode = 'starray'):
    
     # define all domain specific regexes for locating vhost
     docSearch = re.compile(r'\s*?DocumentRoot\s' + searchString)
-    domSearch = re.compile(r'\s*?Server(Name|Alias).*?\s' + searchString + '.*?')
+    domSearch = re.compile(r'\s*?Server(Name|Alias).*?\s' + searchString + '(\s.*|\b)')
     usrSearch = re.compile(r'\s*?AssignUserID\s' + searchString + '\s' + searchString)
     
-    # defing all non specific regexes for determining line position
+    # define all non specific regexes for determining line position
     ovhMatch = re.compile(r'<VirtualHost [1-2]?[0-9]{1,2}(\.[1-2]?[0-9]{1,2}){3}:(80|443)>')
     cvhMatch = re.compile(r'</VirtualHost>')
     docMatch = re.compile(r'\s*?DocumentRoot\s.*')
