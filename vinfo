@@ -155,7 +155,7 @@ def getHost (searchString, mode = 'starray'):
         frmPause = '%-3s- %-' + str(lenPri + 3) + 's- %-' + str(lenIpa + 1) + 's- %-4s- %-2s'
 
         # dont display menu if 2 or less results displayed when docroot/domain searched for
-        if len(hostList) <= 2 and not isset('menu'):
+        if len(hostList) <= 2 and not isset('menu') and mode != 'list':
             hostSelection = len(hostList)
 
         # display menu to prompt for vhost selection if user searched for 
@@ -171,6 +171,9 @@ def getHost (searchString, mode = 'starray'):
                 print(frmPause % (hostId, '"' + host[4] + '"', host[2], host[3], host[5]))
                 hostId += 1
             
+            if mode == 'list':
+                sys.exit()
+
             # try used so if non integer is provided, no error is shown, it just loops
             try:
                 print
@@ -437,7 +440,8 @@ parser.add_argument("-c", "--cert", help="retrieve the location of the SSL cert 
 parser.add_argument("-S", help="used with -c to specify 'web' or 'mail' for certfile retrieval. defaults to both.", dest="srvc")
 parser.add_argument("-d", "--domain", help="retrieve list of domains for given docroot", action="store_true")
 parser.add_argument("-D", help="used with -d to specify which domains select between servername or serveralias. options: primary, secondary", dest="type")
-parser.add_argument("-g", "--get-host", help="retrieves entire vhost. negates all other options with the exception of --clean", action="store_true")
+parser.add_argument("-g", "--get-host", help="retrieves entire vhost", action="store_true")
+parser.add_argument("-l", "--list", help="lists all vhosts associated with a user", action="store_true")
 parser.add_argument("-r", "--root", help="retrieve the docroot for a given domain", action="store_true")
 parser.add_argument("-s", "--ssl-test", help="retrieve SSL information for a given domain / docroot", action="store_true")
 parser.add_argument("-P", help="used with -s to specify service(s) to run checks. supports comma separated input.", dest="port")
@@ -527,10 +531,29 @@ if args.clean:
 else:
     output = 'display'
 
-# `vinfo -g (domain or docroot)`
-# negates all other options except --clean 
+# `vinfo -l (domain|docroot|user)`
+# lists all vhosts associated with a user
+if args.list:
+    errOut = []
+    for check in args.__dict__:
+        if check != 'search' and check != 'clean' and check != 'list' and args.__dict__[check]:
+            errOut.append(args.__dict__[check])
+    if len(errOut) != 0:
+        print('\033[1;31mFatal Error:\033[0m')
+        sys.exit('     no other arguments accepted with -l')
+    getHost(search, 'list')
+
+# `vinfo -g (domain|docroot|user)`
 # formatted includes line numbers from httpd.conf 
 if args.get_host:
+    errOut = []
+    for check in args.__dict__:
+        if check != 'search' and check != 'clean' and check != 'get_host' and args.__dict__[check]:
+            errOut.append(args.__dict__[check])
+    if len(errOut) != 0:
+        print('\033[1;31mFatal Error:\033[0m')
+        sys.exit('     only --clean my be used with -g')
+
     if args.clean:
         print getHost(search, output)
     else:
@@ -539,7 +562,7 @@ if args.get_host:
 else:
     virtualHost = getHost(search)
 
-# `vinfo -a (domain|docroot)`
+# `vinfo -a (domain|docroot|user)`
 # retrieves ip address from vhost
 # affected by --clean
 if args.address:
@@ -548,7 +571,7 @@ if args.address:
     else:
         getAddr(virtualHost)
 
-# `vinfo -u (domain|docroot)`
+# `vinfo -u (domain|docroot|user)`
 # retrieves user owning the docroot from vhost, not filepath 
 # affected by --clean 
 if args.user:
@@ -557,7 +580,7 @@ if args.user:
     else:
         getUser(virtualHost)
 
-# `vinfo -r [domain or docroot]`
+# `vinfo -r (domain|docroot|user)`
 # retrieves docroot from vhost
 # affected by --clean
 if args.root:
@@ -566,7 +589,7 @@ if args.root:
     else:
         getRoot(virtualHost)
 
-# `vinfo -d [-D (pri|sec)] (domain|docroot)`
+# `vinfo -d [-D (pri|sec)] (domain|docroot|user)`
 # retrieves servername and serveralias domains, defaults to both
 # affected by --clean
 if args.domain:
@@ -581,7 +604,7 @@ if args.domain:
         else:
             getDoms(virtualHost)
 
-# `vinfo -c [-S (web|mail)] (domain|docroot)`
+# `vinfo -c [-S (web|mail)] (domain|docroot|user)`
 # retrieves location of certs used to secure either mail or apache, defaults to both 
 # affected by --clean 
 if args.cert:
@@ -596,7 +619,7 @@ if args.cert:
         else:
             getFile(virtualHost)
 
-# `vinfo -s [-P apache,mail,http,smtp,imap,pop3] (domain|docroot)`
+# `vinfo -s [-P apache,mail,http,smtp,imap,pop3] (domain|docroot|user)`
 # tests all ssl certs, returns (valid|invalid|expired) - [expiration date] for each (file|service) tested
 # defaults to test all. specified domain used for test if vinfo was run with domain. 
 # if docroot was used, primary domain from vhost will be used 
@@ -615,7 +638,7 @@ if args.ssl_test:
         
 # if no options specified, run default 
 # equivalent of:
-#       `vinfo -aurdcs -D all -P all -S all (domain|docroot)`
+#       `vinfo -aurdcs -D all -P all -S all (domain|docroot|user)`
 # not affected by --clean
 default = True
 for check in args.__dict__:
