@@ -227,7 +227,7 @@ def getAddr(hostIn, mode = 'display'):
     	return ipAddr
 
 def getUser(hostIn, mode = 'display'):
-    usMatch  = re.compile(r'\s*?PassengerUser.*')
+    usMatch  = re.compile(r'\s*?AssignUserID.*')
     usrName = list(filter(usMatch.match, hostIn))[-1].split(' ')[-1]
     if mode == 'display':
         print(frmStr % ('User', usrName))
