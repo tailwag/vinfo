@@ -93,7 +93,7 @@ def getHost (searchString, mode = 'starray'):
         hostList  = []
 
         # determine line(s) on which searchstring was found
-        foundOn = [i for i, x in enumerate(vhost) if x == found[-1]]
+        foundOn = [i for i, x in enumerate(vhost) if x.lstrip() == found[-1].lstrip()]
 
         # determines the print formatting of the menu
         # updated later depending on how log the ips and domains are 
