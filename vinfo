@@ -1,7 +1,12 @@
 #!/usr/bin/python
 
 # vInfo - Devin Shoemaker     2019-03-03
-#             Beta v0.2.4     2019-03-13
+#
+# MAJOR: 1
+# MINOR: 0
+# PATCH: 0 
+# EXTRA: 0
+#
 # https://github.com/tailwag/vinfo
 # `vinfo -h` for usage
 
