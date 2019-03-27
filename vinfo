@@ -1,7 +1,12 @@
 #!/usr/bin/python
 
 # vInfo - Devin Shoemaker     2019-03-03
-#             Beta v0.2.4     2019-03-13
+#
+# MAJOR: 1
+# MINOR: 0
+# PATCH: 0 
+# EXTRA: 0
+#
 # https://github.com/tailwag/vinfo
 # `vinfo -h` for usage
 
@@ -38,12 +43,15 @@ def addNulls (intIn):
     else:
         return intIn
 	
-def getHost (searchString, mode = 'starray'): 
+def getHost (searchString, mode = 'starray', fileLoc = False): 
     # retrieve whole httpd.conf
-    if os.path.isdir('/etc/apache2/conf'):
-        getConf = 'sudo cat /etc/apache2/conf/httpd.conf'
+    if fileLoc:
+        getConf = 'sudo cat ' + fileLoc
     else:
-        getConf = 'sudo cat /etc/httpd/conf/httpd.conf'
+        if os.path.isdir('/etc/apache2/conf'):
+            getConf = 'sudo cat /etc/apache2/conf/httpd.conf'
+        else:
+            getConf = 'sudo cat /etc/httpd/conf/httpd.conf'
     
     conf = subprocess.Popen(getConf, stdout=subprocess.PIPE, shell=True).communicate()[0]
     
@@ -447,6 +455,7 @@ parser.add_argument("-c", "--cert", help="retrieve the location of the SSL cert 
 parser.add_argument("-S", help="used with -c to specify which services certs should be selected for\n" +
                                 "-options are 'web' or 'mail'\n\n", dest="srvc")
 parser.add_argument("-d", "--domain", help="retrieve list of domains for given docroot", action="store_true")
+parser.add_argument("-f", "--file", help="specify the httpd.conf to use", dest="conf")
 parser.add_argument("-D", help="used with -d to specify which domains select between servername or serveralias\n" + 
                                "-options: primary, secondary\n\n", dest="type")
 parser.add_argument("-g", "--get-host", help="retrieves entire vhost\n", action="store_true")
@@ -565,12 +574,21 @@ if args.get_host:
         sys.exit('     only --clean my be used with -g')
 
     if args.clean:
-        print getHost(search, output)
+        if args.conf:
+            print getHost(search, output, args.conf)
+        else:
+            print getHost(search, output)
     else:
-        getHost(search, output)
+        if args.conf:
+            getHost(search, output, args.conf)
+        else:
+            getHost(search, output)
     sys.exit()
 else:
-    virtualHost = getHost(search)
+    if args.conf:
+        virtualHost = getHost(search, 'starray', args.conf)
+    else:
+        virtualHost = getHost(search)
 
 # `vinfo -a (domain|docroot|user)`
 # retrieves ip address from vhost
