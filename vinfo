@@ -4,7 +4,7 @@
 #
 # MAJOR: 1
 # MINOR: 0
-# PATCH: 0 
+# PATCH: 1 
 # EXTRA: 0
 #
 # https://github.com/tailwag/vinfo
@@ -39,7 +39,7 @@ def getMonth (monthIn):
 
 def addNulls (intIn):
     if intIn < 10:
-        return 0 + intIn
+        return '0' + str(intIn)
     else:
         return intIn
 	
@@ -404,9 +404,9 @@ def getCert(hostIn, ports = ['apache', 'mail', '443', '465', '993', '995']):
                 # concatenate date from openssl while converting 3 letter date code to 2 digit int
                 # certdate = YearMonthDayHourMinuteSecond (YYYYmmddHHMMSS) in GMT (openssl default)
                 if dateArr[2] == '':
-                    certDate = dateArr[5] + str(addNulls(getMonth(dateArr[1]))) + str(addNulls(dateArr[3])) + dateArr[4].replace(":", "")
+                    certDate = dateArr[5] + addNulls(getMonth(dateArr[1])) + str(addNulls(dateArr[3])) + dateArr[4].replace(":", "")
                 else:
-                    certDate = dateArr[4] + str(addNulls(getMonth(dateArr[1]))) + str(dateArr[2]) + dateArr[4].replace(":", "")
+                    certDate = dateArr[4] + addNulls(getMonth(dateArr[1])) + str(dateArr[2]) + dateArr[3].replace(":", "")
 
                 # retrieves current datetime from system in GMT
                 # system used for portability, as pytz is not usually installed by default
